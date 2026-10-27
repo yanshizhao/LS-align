@@ -36,7 +36,7 @@ private:
 	int 	rough_sliding_step;	// the rough sliding step default is 5
 	int 	detail_sliding_step;	// the detail sliding step default is 1
 
-	double alisco;					// 1/alinum * sum_{ali_{i}} (1 / (1 + (d_{ali{i}})^2 / (d0)^2))
+	double alisco;					// mean ithsco over aligned pairs with dis <= d0; ithsco = 0.45 * (1 / (1 + dis^2/d0^2)) + 0.1 * massSco + 0.45 * junBondSco
 
 	AlignInfo* p_AliInfo;			// the last alignment result
 	double rotMtx[3][3];			// the last rotation matrix
