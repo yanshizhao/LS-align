@@ -47,3 +47,13 @@ TEST(ligands_hydrogens_dropped_by_default) {
     Ligands withH("../example/xtal-lig.mol2", true);
     CHECK(withH[0].size() == 59);
 }
+
+/* ---- B24: an empty ATOM section parses to a zero-atom ligand ---- */
+TEST(empty_ligand_from_parse_has_zero_atoms) {
+    /* Parse only -- no alignment.  Before the fix this already did not crash,
+     * so it is a plain TEST regression lock, not an XFAIL. */
+    Ligands ligs("fixtures/empty_ligand.mol2", false);
+    CHECK(ligs.size() == 1);
+    CHECK(ligs[0].size() == 0);
+    CHECK(ligs[0].getLigname() == "EMPTYLIG");
+}
