@@ -761,6 +761,10 @@ private:
 			oldMapNewInd = NULL;
 		}
 		
+		if (points.empty()){
+			cerr << "LSalign: warning: ligand '" << ligname << "' in " << mol2path
+				<< " has no atoms; its scores will be 0" << endl;
+		}
 		Ligand ans(ligname, points, atomtypes, bondInfoes);
 		return ans;
 	}

@@ -403,15 +403,16 @@ public:
 	}
 
 	double getLSscore(){
-		return p_AliInfo->sco/(templ.size()>query.size()?templ.size():query.size());
+		int denom = templ.size() > query.size() ? templ.size() : query.size();
+		return (denom > 0) ? (p_AliInfo->sco / denom) : 0.0;
 	}
 	
 	double getLSscore8QuerySize(){
-		return p_AliInfo->sco / query.size();
+		return (query.size() > 0) ? (p_AliInfo->sco / query.size()) : 0.0;
 	}
 
 	double getLSscore8TemplSize(){
-		return p_AliInfo->sco / templ.size();
+		return (templ.size() > 0) ? (p_AliInfo->sco / templ.size()) : 0.0;
 	}
 
 	vector<AlignedPair> getFinalAlignedPair(){
@@ -434,9 +435,8 @@ public:
 		if (0 == finalAlignedPairDist.size()){
 			parseFinalAliInfo();
 		}
-		double ans = 1.0 * finalAlignedPairDist.size() / ((int)templ.size() + (int)query.size() - (int)finalAlignedPairDist.size());
-
-		return ans;
+		int denom = (int)templ.size() + (int)query.size() - (int)finalAlignedPairDist.size();
+		return (denom > 0) ? (1.0 * finalAlignedPairDist.size() / denom) : 0.0;
 	}
 
 	double getAlignedRMSD(){

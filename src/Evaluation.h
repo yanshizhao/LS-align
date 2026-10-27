@@ -10,6 +10,7 @@ using namespace std;
  * Notice: the size of aPts must equal to that of bPts
  *********************************************************/
 double RMSD(vector<Point3D> aPts, vector<Point3D> bPts){
+	if (aPts.size() == 0 || bPts.size() == 0) return -1.0;
 	double ans = 0.0;
 	for (int i = 0; i < aPts.size(); i++){
 		ans += aPts[i].distPow2(bPts[i]);
@@ -25,6 +26,7 @@ double RMSD(vector<Point3D> aPts, vector<Point3D> bPts){
  * Notice: the size of aPts must equal to that of bPts
  *********************************************************/
 double RMSD_ub(vector<Point3D> aPts, vector<Point3D> bPts){
+	if (aPts.size() == 0 || bPts.size() == 0) return -1.0;
 	double ans = 0.0;
 	for (int i = 0; i < aPts.size(); i++){
 		ans += aPts[i].distPow2(bPts[i]);
@@ -42,6 +44,7 @@ double RMSD_ub(vector<Point3D> aPts, vector<Point3D> bPts){
  * 	Optimization, and Multithreading".
  *********************************************************/
 double RMSD_lb(vector<Point3D> aPts, vector<Point3D> bPts){
+	if (aPts.size() == 0 || bPts.size() == 0) return -1.0;
 	int i = 0, j = 0;
 	
 	double** p_disPow2Mtx = new double*[aPts.size()];
@@ -90,6 +93,7 @@ double RMSD_lb(vector<Point3D> aPts, vector<Point3D> bPts){
  * Here, we chose the minimum value.
  *********************************************************/
 double RMSD_lb_min(vector<Point3D> aPts, vector<Point3D> bPts){
+	if (aPts.size() == 0 || bPts.size() == 0) return -1.0;
 	int i = 0, j = 0;
 	
 	double** p_disPow2Mtx = new double*[aPts.size()];

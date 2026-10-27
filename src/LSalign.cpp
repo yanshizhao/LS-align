@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <limits>
 #include "Point3D.h"
 #include "Ligands.h"
 #include "basic_fun.h"
@@ -384,11 +385,12 @@ int main(int argc, char* args[]){
 				double Pval_8T = 1.0 - exp( -exp(- ((LSscore8TemplSize - u_T)/delta_T)));
 				double JaccardR = p_ali->getJaccardRatio();
 //				double alisco = p_ali->getAliSco();
-				double RMSD_lb = p_ali->getRMSD_lb();
+				double RMSD_lb_val = p_ali->getRMSD_lb();
+				double RMSD_lb_out = (RMSD_lb_val < 0.0) ? std::numeric_limits<double>::quiet_NaN() : RMSD_lb_val;
 //				double RMSD_lb_mim = p_ali->getRMSD_lb_min();
 				
 				sprintf(buf, "%18s %18s %10.4f %10.4f %10.6f %10.6f %10.4f %10.4f %14d %14d", ithQnameChArr, jthTnameChArr, 
-					LSscore8QuerySize, LSscore8TemplSize, Pval_8Q, Pval_8T, JaccardR, RMSD_lb, queryligs[i].size(), templligs[j].size());
+					LSscore8QuerySize, LSscore8TemplSize, Pval_8Q, Pval_8T, JaccardR, RMSD_lb_out, queryligs[i].size(), templligs[j].size());
 				cout << buf << endl;
 				
 				// save the superposition between the Qth-query ligand with the Tth-templ ligand
