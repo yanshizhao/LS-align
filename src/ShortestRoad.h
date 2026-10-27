@@ -119,6 +119,7 @@ private:
 					}
 				}
 				
+				delete[] allRoad8Floyd[i][j];
 				allRoad8Floyd[i][j] = tmpPath;
 				allRoadLen8Floyd[i][j] = roadLen[0];
 				
