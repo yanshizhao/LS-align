@@ -27,40 +27,54 @@
 
 namespace leakprobe {
 inline long& live() { static long n = 0; return n; }
+inline long& mismatch() { static long n = 0; return n; }
+
+const unsigned SCALAR_MAGIC = 0x5343414cu;
+const unsigned ARRAY_MAGIC  = 0x41525241u;
+
+struct Header { unsigned magic; unsigned pad[3]; };
 }
 
 inline long liveAllocs() { return leakprobe::live(); }
+inline long mismatchCount() { return leakprobe::mismatch(); }
 
 /* Replacement allocator: route everything through malloc/free so the count is
  * symmetric across all overloads used by this single-TU program. */
-inline void* lp_alloc(std::size_t n) {
-    void* p = std::malloc(n ? n : 1);
-    if (p) ++leakprobe::live();
-    return p;
+inline void* lp_alloc(std::size_t n, unsigned tag) {
+    leakprobe::Header* h = static_cast<leakprobe::Header*>(
+        std::malloc(sizeof(leakprobe::Header) + (n ? n : 1)));
+    if (!h) return 0;
+    h->magic = tag;
+    ++leakprobe::live();
+    return h + 1;
 }
-inline void lp_free(void* p) {
-    if (p) { --leakprobe::live(); std::free(p); }
+inline void lp_free(void* p, unsigned expected) {
+    if (!p) return;
+    leakprobe::Header* h = static_cast<leakprobe::Header*>(p) - 1;
+    if (h->magic != expected) ++leakprobe::mismatch();
+    --leakprobe::live();
+    std::free(h);
 }
 
-void* operator new(std::size_t n) { void* p = lp_alloc(n); if (!p) throw std::bad_alloc(); return p; }
-void* operator new[](std::size_t n) { void* p = lp_alloc(n); if (!p) throw std::bad_alloc(); return p; }
-void* operator new(std::size_t n, const std::nothrow_t&) noexcept { return lp_alloc(n); }
-void* operator new[](std::size_t n, const std::nothrow_t&) noexcept { return lp_alloc(n); }
+void* operator new(std::size_t n) { void* p = lp_alloc(n, leakprobe::SCALAR_MAGIC); if (!p) throw std::bad_alloc(); return p; }
+void* operator new[](std::size_t n) { void* p = lp_alloc(n, leakprobe::ARRAY_MAGIC); if (!p) throw std::bad_alloc(); return p; }
+void* operator new(std::size_t n, const std::nothrow_t&) noexcept { return lp_alloc(n, leakprobe::SCALAR_MAGIC); }
+void* operator new[](std::size_t n, const std::nothrow_t&) noexcept { return lp_alloc(n, leakprobe::ARRAY_MAGIC); }
 
-void operator delete(void* p) noexcept { lp_free(p); }
-void operator delete[](void* p) noexcept { lp_free(p); }
-void operator delete(void* p, const std::nothrow_t&) noexcept { lp_free(p); }
-void operator delete[](void* p, const std::nothrow_t&) noexcept { lp_free(p); }
-void operator delete(void* p, std::size_t) noexcept { lp_free(p); }
-void operator delete[](void* p, std::size_t) noexcept { lp_free(p); }
+void operator delete(void* p) noexcept { lp_free(p, leakprobe::SCALAR_MAGIC); }
+void operator delete[](void* p) noexcept { lp_free(p, leakprobe::ARRAY_MAGIC); }
+void operator delete(void* p, const std::nothrow_t&) noexcept { lp_free(p, leakprobe::SCALAR_MAGIC); }
+void operator delete[](void* p, const std::nothrow_t&) noexcept { lp_free(p, leakprobe::ARRAY_MAGIC); }
+void operator delete(void* p, std::size_t) noexcept { lp_free(p, leakprobe::SCALAR_MAGIC); }
+void operator delete[](void* p, std::size_t) noexcept { lp_free(p, leakprobe::ARRAY_MAGIC); }
 
 #if defined(__cpp_aligned_new)
-void* operator new(std::size_t n, std::align_val_t) { void* p = lp_alloc(n); if (!p) throw std::bad_alloc(); return p; }
-void* operator new[](std::size_t n, std::align_val_t) { void* p = lp_alloc(n); if (!p) throw std::bad_alloc(); return p; }
-void operator delete(void* p, std::align_val_t) noexcept { lp_free(p); }
-void operator delete[](void* p, std::align_val_t) noexcept { lp_free(p); }
-void operator delete(void* p, std::size_t, std::align_val_t) noexcept { lp_free(p); }
-void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { lp_free(p); }
+void* operator new(std::size_t n, std::align_val_t) { void* p = lp_alloc(n, leakprobe::SCALAR_MAGIC); if (!p) throw std::bad_alloc(); return p; }
+void* operator new[](std::size_t n, std::align_val_t) { void* p = lp_alloc(n, leakprobe::ARRAY_MAGIC); if (!p) throw std::bad_alloc(); return p; }
+void operator delete(void* p, std::align_val_t) noexcept { lp_free(p, leakprobe::SCALAR_MAGIC); }
+void operator delete[](void* p, std::align_val_t) noexcept { lp_free(p, leakprobe::ARRAY_MAGIC); }
+void operator delete(void* p, std::size_t, std::align_val_t) noexcept { lp_free(p, leakprobe::SCALAR_MAGIC); }
+void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { lp_free(p, leakprobe::ARRAY_MAGIC); }
 #endif
 
 /* RAII helper: measure the change in live allocations over a scope. */
@@ -68,6 +82,12 @@ struct LeakDelta {
     long base;
     LeakDelta() : base(leakprobe::live()) {}
     long delta() const { return leakprobe::live() - base; }
+};
+
+struct MismatchDelta {
+    long base;
+    MismatchDelta() : base(leakprobe::mismatch()) {}
+    long delta() const { return leakprobe::mismatch() - base; }
 };
 
 #endif /* LEAK_PROBE_H */
