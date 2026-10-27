@@ -34,9 +34,11 @@ XFAIL(leak_dijkstra_flag_array) {
     Ligand L = ligs[0];
     /* warm up lazy allocations (locale, iostream) outside the measured scope */
     { std::vector<std::vector<BondType> > warm = L.getAtomBondTypes(); (void)warm; }
-    Ligand L2 = ligs[0];
     LeakDelta d;
-    { std::vector<std::vector<BondType> > bt = L2.getAtomBondTypes(); (void)bt; }
+    /* L2 must be inside the measured scope: its bondDisMtx/btMtx/atomBondTypes
+     * caches are only freed by ~Ligand, so measuring while L2 is still alive
+     * counts those caches as leaks and can never go green on the B6 fix. */
+    { Ligand L2 = ligs[0]; L2.getAtomBondTypes(); }
     /* correct behaviour: no net allocation leak */
     CHECK(d.delta() == 0);
 }
