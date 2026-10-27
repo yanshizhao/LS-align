@@ -573,6 +573,8 @@ private:
 		release2DArr(3, rotMtx);
 		delete rot_axis;
 		rot_axis = NULL;   
+		delete[] newPoss;
+		newPoss = NULL;
 	}
 	
 	ShortestRoad* shortestRoadBetweenTwoAtoms(){
