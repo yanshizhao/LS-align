@@ -235,7 +235,7 @@ public:
 		string sixthLine(buf);
 		ans.push_back(sixthLine);
 
-		sprintf(buf, "The Aligned number in the LS-align is %d", finalAlignedPairDist.size());
+		sprintf(buf, "The Aligned number in the LS-align is %d", (int)finalAlignedPairDist.size());
 		string seventhLine(buf);
 		ans.push_back(seventhLine);
 		
