@@ -453,7 +453,7 @@ private:
 			ans.push_back(ind);
 		}
 
-		delete index;
+		delete[] index;
 		index = NULL;
 
 		return ans;
