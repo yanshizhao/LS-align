@@ -570,18 +570,19 @@ private:
 * we load all the ligands in mol2path
 	*****************************************/
 	void load(){
-		vector<vector<string> > mol2StrInfos = loadAllLigStrInfoMol2();
+		vector<int> blockStartLines;
+		vector<vector<string> > mol2StrInfos = loadAllLigStrInfoMol2(blockStartLines);
 		
 		for (int i = 0; i < mol2StrInfos.size(); i++){
 			vector<string> mol2Info = mol2StrInfos[i];
-			Ligand lig = parseOneLigMol2(mol2Info);
+			Ligand lig = parseOneLigMol2(mol2Info, blockStartLines[i]);
 			
 			ligs.push_back(lig);
 		}
 		
 	}	
 	
-	Ligand parseOneLigMol2(vector<string> oneLigMol2Infos){
+	Ligand parseOneLigMol2(vector<string> oneLigMol2Infos, int blockStartLine){
 		string ligname;
 		vector<Point3D> points;
 		vector<string> atomtypes;
@@ -740,13 +741,15 @@ private:
 	* load all the ligand information in the mol2 file
 	* using the string container
 	***********************************************/
-	vector<vector<string> > loadAllLigStrInfoMol2(){
+	vector<vector<string> > loadAllLigStrInfoMol2(vector<int>& blockStartLines){
 		vector<vector<string> > ans;
 		
 		bool isFirst = true;
 		vector<string> mol2Sb;
 		ifstream fin(mol2path.c_str());
 		string line;
+		int lineNo = 1;			// 1-based file line number of `line`
+		int curBlockStartLine = 1;	// file line number of mol2Sb[0]
 		getline(fin, line);
 		while (fin.good()){
 			line = eraseAll(line, '\r');	// Since the differnece between windows (\r\n) and Linux (\n), so we should do this step.
@@ -755,20 +758,28 @@ private:
 					isFirst = false;
 				}else{
 					ans.push_back(mol2Sb);
+					blockStartLines.push_back(curBlockStartLine);
 					mol2Sb.erase(mol2Sb.begin(), mol2Sb.end());
 				}
 			}
 			
+			// mol2Sb[0] may precede the first MOLECULE (comment header); this
+			// keeps the index->file-line mapping exact for every block.
+			curBlockStartLine = lineNo - (int)mol2Sb.size();
+			
 			mol2Sb.push_back(line);
 			getline(fin, line);
+			lineNo++;
 			if (!fin.good()){
 				mol2Sb.push_back(line);
 			}
 		}
 		fin.close();
 		
-		if (!isFirst)
+		if (!isFirst){
 			ans.push_back(mol2Sb);
+			blockStartLines.push_back(curBlockStartLine);
+		}
 		return ans;
 	}
 };
