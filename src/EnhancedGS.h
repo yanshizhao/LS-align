@@ -73,6 +73,9 @@ public :
 		
 		return aliPairs;
 	}
+
+private:
+	AlignInfo& operator=(const AlignInfo&);
 };
 
 /****************************************************

@@ -1164,6 +1164,8 @@ private:
 		double simSco = aliSco / (1 + abs(1.0 * ((int)aAtomBondTypes.size() - (int)bAtomBondTypes.size())));
 		return simSco;
 	}
+
+	RigidLSalign& operator=(const RigidLSalign&);
 };
 
 #endif
