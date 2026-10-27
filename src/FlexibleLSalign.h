@@ -113,6 +113,9 @@ public :
 
 				p_ans = p_ithLSalign;
 				p_ithLSalign = NULL;
+			}else{
+				delete p_ithLSalign;
+				p_ithLSalign = NULL;
 			}
 		}
 
