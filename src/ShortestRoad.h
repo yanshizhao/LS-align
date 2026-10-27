@@ -51,7 +51,7 @@ public:
 			release2DIntArr(*p_node_num, allRoadLen8Floyd);
 		}
 		
-		delete p_node_num;
+		delete[] p_node_num;
 	}
 
 	int*** getAllRoad8Floyd(){
