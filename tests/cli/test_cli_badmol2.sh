@@ -13,4 +13,63 @@ assert_alive "E: isolated_atom x self" "${FIX}/isolated_atom.mol2" "${FIX}/self.
 echo "== CLI: zero-atom ligand does not crash (B24) =="
 assert_alive "F: empty_ligand x self" "${FIX}/empty_ligand.mol2" "${FIX}/self.mol2" -rf 0
 
+# ---------------------------------------------------------------------------
+# A/B: malformed mol2 must be rejected with a diagnostic, not crash.
+# The binary reports to stderr, so these use run_ls_capture rather than run_ls.
+# Line numbers are derived from the fixture at test time (never hard-coded).
+# ---------------------------------------------------------------------------
+data_rows() {   # $1 = stdout text
+    printf '%s\n' "$1" | awk 'NR>2 && $3 ~ /^[0-9]+\.[0-9]+$/ {n++} END{print n+0}'
+}
+
+echo "== CLI: truncated ATOM record is rejected (B21) =="
+short_line="$(awk '
+    /^@<TRIPOS>ATOM/ { inatom=1; next }
+    /^@<TRIPOS>/     { inatom=0 }
+    inatom && length($0) > 0 && length($0) < 48 { print NR; exit }
+' "${FIX}/bad_short_atom.mol2")"
+run_ls_capture a_out a_err "${FIX}/bad_short_atom.mol2" "${FIX}/self.mol2" -rf 0
+if printf '%s' "${a_err}" | grep -q "ATOM record too short"; then
+    ok "A: stderr reports 'ATOM record too short'"
+else
+    bad "A: stderr missing 'ATOM record too short' (got: ${a_err})"
+fi
+if printf '%s' "${a_err}" | grep -q "bad_short_atom\.mol2:${short_line}:"; then
+    ok "A: stderr names fixture and line ${short_line}"
+else
+    bad "A: expected bad_short_atom.mol2:${short_line} in stderr (got: ${a_err})"
+fi
+if printf '%s' "${a_err}" | grep -Eq "out_of_range|terminate"; then
+    bad "A: raised an exception instead of a diagnostic"
+else
+    ok "A: no out_of_range / terminate"
+fi
+assert_eq "A: no data rows on stdout" "$(data_rows "${a_out}")" "0"
+
+echo "== CLI: out-of-range BOND index is rejected (B23) =="
+bond_line="$(awk '
+    /^@<TRIPOS>ATOM/ { inatom=1; next }
+    /^@<TRIPOS>BOND/ { inatom=0; inbond=1; next }
+    /^@<TRIPOS>/     { inbond=0 }
+    inatom && $0 !~ /^[ \t]*$/ { natoms++ }
+    inbond && NF >= 4 && ($2+0 > natoms || $3+0 > natoms) { print NR; exit }
+' "${FIX}/bad_bond_index.mol2")"
+run_ls_capture b_out b_err "${FIX}/bad_bond_index.mol2" "${FIX}/self.mol2" -rf 0
+if printf '%s' "${b_err}" | grep -q "BOND record refers to atom index out of range"; then
+    ok "B: stderr reports 'BOND record refers to atom index out of range'"
+else
+    bad "B: stderr missing BOND-index diagnostic (got: ${b_err})"
+fi
+if printf '%s' "${b_err}" | grep -q "bad_bond_index\.mol2:${bond_line}:"; then
+    ok "B: stderr names fixture and line ${bond_line}"
+else
+    bad "B: expected bad_bond_index.mol2:${bond_line} in stderr (got: ${b_err})"
+fi
+if printf '%s' "${b_err}" | grep -q "valid 1-"; then
+    ok "B: stderr states the valid index range"
+else
+    bad "B: stderr missing valid range (got: ${b_err})"
+fi
+assert_eq "B: no data rows on stdout" "$(data_rows "${b_out}")" "0"
+
 finish
