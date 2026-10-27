@@ -72,4 +72,40 @@ else
 fi
 assert_eq "B: no data rows on stdout" "$(data_rows "${b_out}")" "0"
 
+# ---------------------------------------------------------------------------
+# C: column values for a zero-atom ligand (B24).
+# Defined zeros: PC-score8Q/8T and JaccardR.  NaN: both Pval columns (log(0))
+# and RMSD_lb (the -1.0 sentinel is printed as NaN).
+# ---------------------------------------------------------------------------
+echo "== CLI: zero-atom ligand column values (B24) =="
+c_out_f="$(mktemp)"; c_err_f="$(mktemp)"
+"${BIN}" "${FIX}/empty_ligand.mol2" "${FIX}/self.mol2" -rf 0 >"${c_out_f}" 2>"${c_err_f}"
+c_rc=$?
+c_row="$(awk '$1=="EMPTYLIG" {print $3, $4, $5, $6, $7, $8; exit}' "${c_out_f}")"
+c_err="$(cat "${c_err_f}")"
+rm -f "${c_out_f}" "${c_err_f}"
+
+if [ "${c_rc}" -eq 139 ] || [ "${c_rc}" -eq 127 ]; then
+    bad "C: crashed (exit ${c_rc})"
+else
+    ok "C: no crash (exit ${c_rc})"
+fi
+assert_eq "C: PC-score8Q" "$(printf '%s
+' "${c_row}" | awk '{print $1}')" "0.0000"
+assert_eq "C: PC-score8T" "$(printf '%s
+' "${c_row}" | awk '{print $2}')" "0.0000"
+assert_eq "C: Pval_8Q" "$(printf '%s
+' "${c_row}" | awk '{print $3}')" "nan"
+assert_eq "C: Pval_8T" "$(printf '%s
+' "${c_row}" | awk '{print $4}')" "nan"
+assert_eq "C: JaccardR" "$(printf '%s
+' "${c_row}" | awk '{print $5}')" "0.0000"
+assert_eq "C: RMSD_lb" "$(printf '%s
+' "${c_row}" | awk '{print $6}')" "nan"
+if printf '%s' "${c_err}" | grep -q "has no atoms"; then
+    ok "C: stderr reports 'has no atoms'"
+else
+    bad "C: stderr missing 'has no atoms' (got: ${c_err})"
+fi
+
 finish
