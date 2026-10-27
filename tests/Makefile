@@ -19,6 +19,10 @@ WARN     := -Wall -Wextra -Wno-unused-parameter
 OPT      := -O2
 CXXFLAGS := $(STD) $(INCLUDE) $(WARN) $(OPT) $(STATIC)
 UNITFLAGS:= $(STD_UNIT) $(INCLUDE) $(WARN) $(OPT) $(STATIC)
+# Same builds with libstdc++ container bounds checks promoted to hard assertions
+# (deterministic out-of-range detection with file/line, instead of silent UB).
+CXXFLAGS_ASSERT  := $(CXXFLAGS) -D_GLIBCXX_ASSERTIONS
+UNITFLAGS_ASSERT := $(UNITFLAGS) -D_GLIBCXX_ASSERTIONS
 BUILD    := build
 
 # g++ needs a writable temp dir; under make TMP/TEMP/TMPDIR are empty, so g++
@@ -34,7 +38,7 @@ $(shell mkdir -p $(TMPDIR_X) $(BUILD) 2>/dev/null)
 # Windows exec suffix (MSYS make maps this); empty on Linux.
 EXE := .exe
 
-.PHONY: all test unit cli asan golden check-golden clean help
+.PHONY: all test unit unit-assert cli cli-assert asan golden check-golden clean help
 
 all: unit cli
 
@@ -61,6 +65,17 @@ unit: $(BUILD)/unit$(EXE)
 	@echo "== running unit tests =="
 	@./$(BUILD)/unit$(EXE)
 
+# Same unit tests, compiled with -D_GLIBCXX_ASSERTIONS: container misuse aborts
+# deterministically instead of silently corrupting memory.  Expected to match
+# `make unit` exactly (31 passed / 5 xfail); any new failure is a real bug.
+$(BUILD)/unit_assert$(EXE): unit/test_main.cpp mini_test.h leak_probe.h
+	@mkdir -p $(BUILD)
+	$(CXX) $(UNITFLAGS_ASSERT) unit/test_main.cpp -lm -o $@
+
+unit-assert: $(BUILD)/unit_assert$(EXE)
+	@echo "== running unit tests (-D_GLIBCXX_ASSERTIONS) =="
+	@./$(BUILD)/unit_assert$(EXE)
+
 # --------------------------------------------------------------------------- #
 # Black-box CLI tests
 # --------------------------------------------------------------------------- #
@@ -71,6 +86,14 @@ $(BUILD)/LSalign_under_test$(EXE): $(SRC)/LSalign.cpp
 cli: $(BUILD)/LSalign_under_test$(EXE)
 	@echo "== running CLI tests =="
 	@bash cli/run_cli.sh
+
+# Same CLI suite against a -D_GLIBCXX_ASSERTIONS binary.  common.sh honours
+# LSALIGN_BIN, so the default binary used by `make cli` is untouched.
+cli-assert: $(SRC)/LSalign.cpp
+	@mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS_ASSERT) $(SRC)/LSalign.cpp -lm -o $(BUILD)/LSalign_assert$(EXE)
+	@echo "== running CLI tests (-D_GLIBCXX_ASSERTIONS) =="
+	@LSALIGN_BIN=$(BUILD)/LSalign_assert$(EXE) bash cli/run_cli.sh
 
 # --------------------------------------------------------------------------- #
 # Leak check: ASan/UBSan are NOT available on this MinGW toolchain (no libasan

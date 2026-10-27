@@ -5,7 +5,7 @@
 # even on success.  So we never test $? ; we parse stdout instead.
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="${TESTS_DIR}/build/LSalign_under_test"
+BIN="${LSALIGN_BIN:-${TESTS_DIR}/build/LSalign_under_test}"
 EX="${TESTS_DIR}/../example"
 FIX="${TESTS_DIR}/fixtures"
 
@@ -26,6 +26,41 @@ row_for() {   # $1 = query ligand name
 # Count data rows (lines after the 2 header lines whose 3rd column is numeric).
 count_rows() {
     run_ls "$@" | awk 'NR>2 && $3 ~ /^[0-9]+\.[0-9]+$/ {n++} END{print n+0}'
+}
+
+# assert_alive LABEL args...  -- assert the binary ran to completion.
+# The binary always exits 1 on success (LSalign.cpp:453), so success is judged by
+# "not a crash/load failure" (exit 139 = SIGSEGV, 127 = load/double-free abort)
+# plus at least one data row on stdout.
+assert_alive() {
+    local label="$1"; shift
+    local out rc n
+    out="$("${BIN}" "$@" 2>/dev/null)"; rc=$?
+    if [ "${rc}" -eq 139 ] || [ "${rc}" -eq 127 ]; then
+        bad "${label}: crashed (exit ${rc})"
+        return 1
+    fi
+    n="$(printf '%s\n' "${out}" | awk 'NR>2 && $3 ~ /^[0-9]+\.[0-9]+$/ {n++} END{print n+0}')"
+    if [ "${n}" -gt 0 ]; then
+        ok "${label}"
+    else
+        bad "${label}: no data rows"
+        return 1
+    fi
+}
+
+# run_ls_capture OUT_VAR ERR_VAR args...  -- run the binary capturing stdout and
+# stderr separately (the trailing newline of each stream is stripped).  Always
+# returns 0, like run_ls.
+run_ls_capture() {
+    local out_var="$1"; local err_var="$2"; shift 2
+    local out_f err_f
+    out_f="$(mktemp)"; err_f="$(mktemp)"
+    "${BIN}" "$@" >"${out_f}" 2>"${err_f}"
+    eval "${out_var}=\$(cat \"${out_f}\")"
+    eval "${err_var}=\$(cat \"${err_f}\")"
+    rm -f "${out_f}" "${err_f}"
+    return 0
 }
 
 ok()   { CLI_PASS=$((CLI_PASS+1)); echo "[  OK  ] $1"; }
