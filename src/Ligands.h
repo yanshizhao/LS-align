@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cmath>
 #include <stdio.h>
+#include <stdlib.h>
 #include <vector>
 #include <string.h>
 #include <fstream>
@@ -591,18 +592,35 @@ private:
 		int l = 0;
 		while (l < oneLigMol2Infos.size() && oneLigMol2Infos[l].compare(0, 13, "@<TRIPOS>ATOM") != 0){
 			if (oneLigMol2Infos[l].compare(0, 17, "@<TRIPOS>MOLECULE") == 0){
-				ligname = oneLigMol2Infos[++l];
+				if (l + 1 < (int)oneLigMol2Infos.size()){
+					ligname = oneLigMol2Infos[++l];
+				}
 			}
 			
 			l++;
 		}
 		
-		l++;
+		if (l < (int)oneLigMol2Infos.size()){
+			l++;
+		}
 		while (l < oneLigMol2Infos.size()){
 			if (oneLigMol2Infos[l].compare(0, 9, "@<TRIPOS>") == 0){
 				break;
 			}
 			
+			// A truly empty line separates sections; any other line here must be
+			// a full fixed-column ATOM record, otherwise parsing silently misfires.
+			if (oneLigMol2Infos[l].empty()){
+				l++;
+				continue;
+			}
+			if (oneLigMol2Infos[l].size() < 48){
+				cerr << "LSalign: " << mol2path << ":" << blockStartLine + l
+					<< ": ATOM record too short for atom type column (ligand '"
+					<< ligname << "')\n     " << oneLigMol2Infos[l] << endl;
+				exit(EXIT_FAILURE);
+			}
+
 			char cstr[50];
 			double x = 0.0;
 			strcpy(cstr, (oneLigMol2Infos[l].substr(17, 9)).c_str());
@@ -658,6 +676,16 @@ private:
 			int atom2Ind = 0;
 			sscanf(llc[2].c_str(), "%d", &atom2Ind);
 			atom2Ind--;
+
+			int nAtoms = (int)points.size();
+			if (atom1Ind < 0 || atom1Ind >= nAtoms
+				|| atom2Ind < 0 || atom2Ind >= nAtoms || atom1Ind == atom2Ind){
+				cerr << "LSalign: " << mol2path << ":" << blockStartLine + ll
+					<< ": BOND record refers to atom index out of range (ligand '"
+					<< ligname << "', atoms " << (atom1Ind+1) << "-" << (atom2Ind+1)
+					<< ", valid 1-" << nAtoms << ")\n     " << oneLigMol2Infos[ll] << endl;
+				exit(EXIT_FAILURE);
+			}
 			
 			BondType bondtype;	
 			if (llc[3].size() == 1 && llc[3].compare(0, 1, "1")==0){
