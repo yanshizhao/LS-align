@@ -224,10 +224,10 @@ public:
 			}
 			
 			if (!judgeIsOverlapAtomsInLig(p_decoy)){
-				vector<string> pdbstr = p_decoy->format2PDB();
 				ans.push_back(*p_decoy);
-				p_decoy = NULL;
 			}
+			delete p_decoy;
+			p_decoy = NULL;
 
 			delete[] angles;
 			angles = NULL;
@@ -360,10 +360,10 @@ public:
 			}
 			
 			if (!judgeIsOverlapAtomsInLig(p_decoy)){
-				vector<string> pdbstr = p_decoy->format2PDB();
 				ans.push_back(*p_decoy);
-				p_decoy = NULL;
 			}
+			delete p_decoy;
+			p_decoy = NULL;
 
 			delete[] angles;
 			angles = NULL;
