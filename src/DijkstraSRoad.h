@@ -113,7 +113,7 @@ private:
 					if (v < 0 || dist[i] < dist[v])
 						v = i;
 			if (v < 0)
-				return; // if all nodes is processed, return
+				break;
 			flag[v] = true; // tag
 			for (i = 0; i != nNode; ++i)
 				if (adjmap[v][i] >= 0)
