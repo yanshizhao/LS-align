@@ -11,20 +11,21 @@
 #include <string>
 
 /*
- * test_delete_mismatch.cpp -- red locks for defects in the allocation /
- * copy-semantics area (B5/B9/B12/B13/B22/B24 + U2).
+ * test_delete_mismatch.cpp -- regression locks for defects in the allocation /
+ * copy-semantics area (B5/B9/B12/B13/B18/B22/B24 + U2).
  *
- * Every XFAIL below encodes the CORRECT behaviour, so it is red before the
- * corresponding fix and turns XPASS afterwards.  The comment above each case
- * states why it is expected to be red today.
+ * Every case below encodes the CORRECT behaviour and is now a normal TEST: the
+ * defects it encodes are fixed, so the case must pass.  If one starts failing
+ * again, the corresponding defect has regressed.  The comment above each case
+ * records what the pre-fix behaviour was.
  *
- * U2 (default ctor leaves bondDisMtx uninitialized) is NOT a deterministic red
- * lock: its observable effect depends on whatever happens to be on the stack.
- * It is therefore a plain TEST (see the note on that case).
+ * U2 (default ctor leaves bondDisMtx uninitialized) was never a deterministic
+ * red lock: its observable effect depends on whatever happens to be on the
+ * stack.  It has always been a plain TEST (see the note on that case).
  */
 
 /* ---- B12 + B13: ShortestRoad frees int[1] with scalar delete ---- */
-XFAIL(no_delete_mismatch_shortestroad) {
+TEST(no_delete_mismatch_shortestroad) {
     /* pre-fix: 65 mismatches on octane (64 x B13 in the n^2 loop + 1 x B12) */
     Ligands ligs("fixtures/octane.mol2", false);
     std::vector<Ligand> all = ligs.getLigands();
@@ -50,7 +51,7 @@ XFAIL(no_delete_mismatch_shortestroad) {
 }
 
 /* ---- B5 + B12 + B13: LigRotamerDetector's ShortestRoad and select_N ---- */
-XFAIL(no_delete_mismatch_rotamer_c13) {
+TEST(no_delete_mismatch_rotamer_c13) {
     /* pre-fix: 170 mismatches on the C13 chain (169 in the detector ctor --
      * ShortestRoad, plus 1 x B5 inside generateRotamers()).  Reading delta()
      * before the detector is destroyed skips its own B12 (+1). */
@@ -68,7 +69,7 @@ XFAIL(no_delete_mismatch_rotamer_c13) {
 }
 
 /* ---- B11: EnhancedGS deletes each int[] with scalar delete ---- */
-XFAIL(no_delete_mismatch_enhancedgs) {
+TEST(no_delete_mismatch_enhancedgs) {
     /* pre-fix: one mismatch per row of the score matrix (3 for a 3x3) */
     std::vector<std::vector<double> > m;
     for (int i = 0; i < 3; ++i) {
@@ -87,7 +88,7 @@ XFAIL(no_delete_mismatch_enhancedgs) {
 }
 
 /* ---- B22: calculateThreeSpecicalDistPow2 reads [-1] when degenerate ---- */
-XFAIL(three_special_dists_degenerate) {
+TEST(three_special_dists_degenerate) {
     /* pre-fix: lig_size=1 leaves AInd=BInd=-1, so the second loop reads
      * p_disPow2Mtx[0][-1].  With a plain new2DArr(1,1) that is adjacent heap
      * memory and the result is flaky (sometimes 0, sometimes ~1e-307).  We
@@ -121,7 +122,7 @@ XFAIL(three_special_dists_degenerate) {
 }
 
 /* ---- B24: RMSD_lb has no sentinel for an empty input ---- */
-XFAIL(rmsd_lb_empty_returns_sentinel) {
+TEST(rmsd_lb_empty_returns_sentinel) {
     /* pre-fix: (empty, one) = 316227766.0..., (one, empty) = NaN */
     std::vector<Point3D> empty;
     std::vector<Point3D> one;
@@ -155,7 +156,7 @@ TEST(ligand_default_ctor_safe_to_destroy) {
 }
 
 /* ---- B9: operator= appends points instead of replacing them ---- */
-XFAIL(ligand_assign_no_accumulate) {
+TEST(ligand_assign_no_accumulate) {
     /* pre-fix: two assignments into a default target leave 4 atoms, not 2 */
     std::vector<Point3D> pts;
     pts.push_back(Point3D(0.0, 0.0, 0.0));
@@ -182,7 +183,7 @@ XFAIL(ligand_assign_no_accumulate) {
 }
 
 /* ---- B9: operator= leaves stale atomBondTypes in a non-empty target ---- */
-XFAIL(ligand_copy_rebuilds_identical_atom_bond_types) {
+TEST(ligand_copy_rebuilds_identical_atom_bond_types) {
     /* pre-fix: dst keeps octane's 8-atom cache and octane's 8 points, so
      * dst.size()==14 and atomBondTypes.size()==8 after dst = self[0]. */
     Ligands octLigs("fixtures/octane.mol2", false);
@@ -202,7 +203,7 @@ XFAIL(ligand_copy_rebuilds_identical_atom_bond_types) {
 }
 
 /* ---- B18: Ra/Re entries are swapped/duplicated in the mass and vdW tables ---- */
-XFAIL(mass_vdw_table_ra_re) {
+TEST(mass_vdw_table_ra_re) {
     /* Pre-fix: mass table has Ra=186.2071 / Re=226 (swapped), vdW has Re=2.43
      * (duplicate of the correct Re=2.05 earlier in the string).  Expected
      * values come from the periodic table: Ra 226.0254, Re 186.207. */

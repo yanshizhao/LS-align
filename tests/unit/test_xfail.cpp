@@ -7,19 +7,23 @@
 #include <vector>
 
 /*
- * test_xfail.cpp -- expected-failure locks for defects confirmed in the report.
+ * test_xfail.cpp -- regression locks for defects fixed in the batch-1 round.
  *
- * Each XFAIL below encodes the CORRECT behaviour.  Today the code is wrong, so
- * the CHECK fails -> XFAIL (green, expected).  When the underlying defect is
- * fixed, the CHECK passes -> XPASS (red), forcing the maintainer to promote it
- * to TEST.  This makes silent regressions impossible.
+ * The file name is kept for compatibility with older references, but every
+ * case here is now a normal TEST: the defects it encodes are fixed, so the
+ * case must pass.  If one starts failing again, the corresponding defect has
+ * regressed.
  *
- * Leak detection uses the portable leak_probe.h counter (ASan is unavailable on
- * MinGW).  A leak shows a positive delta of live allocations over the scope.
+ * Locked defects:
+ *   ligand_operator_assign_does_not_accumulate          -- B9
+ *   leak_dijkstra_flag_array                            -- B6
+ *   leak_rigid_lsalign                                  -- B1 + B6 + B19
+ *   leak_flexible_lsalign_align                         -- B4 + B15 + B17 + B11-B13
+ *   aligned_rmsd_nan_when_no_pairs                      -- B8
  */
 
 /* ---- Bug: Ligand::operator= does not clear points() -> accumulates ---- */
-XFAIL(ligand_operator_assign_does_not_accumulate) {
+TEST(ligand_operator_assign_does_not_accumulate) {
     Ligands ligs("fixtures/self.mol2", false);
     Ligand b;                 /* default ctor */
     b = ligs[0];              /* operator= #1 */
@@ -29,7 +33,7 @@ XFAIL(ligand_operator_assign_does_not_accumulate) {
 }
 
 /* ---- Bug: DijkstraSRoad leaks the 'flag' array on every getRoad() ---- */
-XFAIL(leak_dijkstra_flag_array) {
+TEST(leak_dijkstra_flag_array) {
     Ligands ligs("fixtures/octane.mol2", false);
     Ligand L = ligs[0];
     /* warm up lazy allocations (locale, iostream) outside the measured scope */
@@ -44,7 +48,7 @@ XFAIL(leak_dijkstra_flag_array) {
 }
 
 /* ---- Bug: RigidLSalign destructor never frees p_AliInfo (inverted test) ---- */
-XFAIL(leak_rigid_lsalign) {
+TEST(leak_rigid_lsalign) {
     Ligands a("fixtures/self.mol2", false);
     Ligands b("fixtures/copy.mol2", false);
     { LeakDelta warm; { RigidLSalign t(a[0], b[0], 2.0); (void)t; } (void)warm; }
@@ -55,7 +59,7 @@ XFAIL(leak_rigid_lsalign) {
 }
 
 /* ---- Bug: FlexibleLSalign::align() leaks non-winning rotamer objects ---- */
-XFAIL(leak_flexible_lsalign_align) {
+TEST(leak_flexible_lsalign_align) {
     Ligands q("fixtures/octane.mol2", false);
     Ligands t("fixtures/self.mol2", false);
     { LeakDelta warm; { FlexibleLSalign f(q[0], t[0], 2.0, false, false, false); RigidLSalign* p = f.align(10); delete p; } (void)warm; }
@@ -70,7 +74,7 @@ XFAIL(leak_flexible_lsalign_align) {
 }
 
 /* ---- Bug: getAlignedRMSD() divides by zero when nothing aligns -> NaN ---- */
-XFAIL(aligned_rmsd_nan_when_no_pairs) {
+TEST(aligned_rmsd_nan_when_no_pairs) {
     /* unrelatedA/B are 3 tiny dissimilar atoms; d0 clamps to 0.1 A, so
      * finalAlignedPair is empty and the RMSD computation is 0/0. */
     Ligands a("fixtures/unrelatedA.mol2", false);
