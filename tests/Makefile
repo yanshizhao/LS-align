@@ -23,6 +23,11 @@ UNITFLAGS:= $(STD_UNIT) $(INCLUDE) $(WARN) $(OPT) $(STATIC)
 # (deterministic out-of-range detection with file/line, instead of silent UB).
 CXXFLAGS_ASSERT  := $(CXXFLAGS) -D_GLIBCXX_ASSERTIONS
 UNITFLAGS_ASSERT := $(UNITFLAGS) -D_GLIBCXX_ASSERTIONS
+
+# Rebuild triggers: the unit TU #includes src/*.h and unit/*.cpp directly, so
+# both must be listed or edits to them silently reuse a stale binary.
+SRC_HEADERS     := $(wildcard $(SRC)/*.h)
+TEST_SOURCES    := $(wildcard unit/*.cpp)
 BUILD    := build
 
 # g++ needs a writable temp dir; under make TMP/TEMP/TMPDIR are empty, so g++
@@ -57,7 +62,7 @@ test: unit cli
 # White-box unit tests: a single TU that #includes the headers (NOT LSalign.cpp,
 # which owns main()).  fixtures/ and example paths are relative to tests/.
 # --------------------------------------------------------------------------- #
-$(BUILD)/unit$(EXE): unit/test_main.cpp mini_test.h leak_probe.h
+$(BUILD)/unit$(EXE): unit/test_main.cpp mini_test.h leak_probe.h $(SRC_HEADERS) $(TEST_SOURCES)
 	@mkdir -p $(BUILD)
 	$(CXX) $(UNITFLAGS) unit/test_main.cpp -lm -o $@
 
@@ -68,7 +73,7 @@ unit: $(BUILD)/unit$(EXE)
 # Same unit tests, compiled with -D_GLIBCXX_ASSERTIONS: container misuse aborts
 # deterministically instead of silently corrupting memory.  Expected to match
 # `make unit` exactly (31 passed / 5 xfail); any new failure is a real bug.
-$(BUILD)/unit_assert$(EXE): unit/test_main.cpp mini_test.h leak_probe.h
+$(BUILD)/unit_assert$(EXE): unit/test_main.cpp mini_test.h leak_probe.h $(SRC_HEADERS) $(TEST_SOURCES)
 	@mkdir -p $(BUILD)
 	$(CXX) $(UNITFLAGS_ASSERT) unit/test_main.cpp -lm -o $@
 
@@ -79,7 +84,7 @@ unit-assert: $(BUILD)/unit_assert$(EXE)
 # --------------------------------------------------------------------------- #
 # Black-box CLI tests
 # --------------------------------------------------------------------------- #
-$(BUILD)/LSalign_under_test$(EXE): $(SRC)/LSalign.cpp
+$(BUILD)/LSalign_under_test$(EXE): $(SRC)/LSalign.cpp $(SRC_HEADERS)
 	@mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) $(SRC)/LSalign.cpp -lm -o $@
 
