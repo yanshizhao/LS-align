@@ -171,7 +171,7 @@ public:
 	~RigidLSalign(){
 		int i = 0;
 
-		if (NULL == p_AliInfo){
+		if (NULL != p_AliInfo){
 			delete p_AliInfo;
 			p_AliInfo = NULL;
 		}
