@@ -107,10 +107,10 @@ public:
 		this->bondInfoes = lig.bondInfoes;
 		
 		if (NULL != lig.btMtx){
-			btMtx = new BondType*[points.size()];
-			for (int i = 0; i < points.size(); i++){
-				btMtx[i] = new BondType[points.size()];
-				for (int j = 0; j < points.size(); j++){
+			btMtx = new BondType*[lig.points.size()];
+			for (int i = 0; i < lig.points.size(); i++){
+				btMtx[i] = new BondType[lig.points.size()];
+				for (int j = 0; j < lig.points.size(); j++){
 					btMtx[i][j] = lig.btMtx[i][j];
 				}
 			}
@@ -119,10 +119,10 @@ public:
 		}
 		
 		if (NULL != lig.bondDisMtx){
-			bondDisMtx = new double*[points.size()];
-			for (int i = 0; i < points.size(); i++){
-				bondDisMtx[i] = new double[points.size()];
-				for (int j = 0; j < points.size(); j++){
+			bondDisMtx = new double*[lig.points.size()];
+			for (int i = 0; i < lig.points.size(); i++){
+				bondDisMtx[i] = new double[lig.points.size()];
+				for (int j = 0; j < lig.points.size(); j++){
 					bondDisMtx[i][j] = lig.bondDisMtx[i][j];
 				}
 			}
@@ -132,62 +132,42 @@ public:
 		
 	}	
 	
-	void operator=(const Ligand& lig){
-		for (int i = 0; i < lig.points.size(); i++){
-			Point3D pt(lig.points[i]);
-			this->points.push_back(pt);
+	Ligand& operator=(const Ligand& lig){
+		if (this == &lig) return *this;
+
+		resetCaches();
+		vector<Point3D>().swap(points);
+
+		for (int i = 0; i < (int)lig.points.size(); i++){
+			points.push_back(lig.points[i]);
 		}
-		
-		this->ligname = lig.ligname;
-		this->atomtypes = lig.atomtypes;
-		this->bondInfoes = lig.bondInfoes;
-		
+		ligname    = lig.ligname;
+		atomtypes  = lig.atomtypes;
+		bondInfoes = lig.bondInfoes;
+
+		int n = (int)lig.points.size();
 		if (NULL != lig.btMtx){
-			btMtx = new BondType*[points.size()];
-			for (int i = 0; i < points.size(); i++){
-				btMtx[i] = new BondType[points.size()];
-				for (int j = 0; j < points.size(); j++){
-					btMtx[i][j] = lig.btMtx[i][j];
-				}
+			btMtx = new BondType*[n];
+			for (int i = 0; i < n; i++){
+				btMtx[i] = new BondType[n];
+				for (int j = 0; j < n; j++) btMtx[i][j] = lig.btMtx[i][j];
 			}
-		}else{
-			btMtx = NULL;
-		}
-		
+		} else btMtx = NULL;
+
 		if (NULL != lig.bondDisMtx){
-			bondDisMtx = new double*[points.size()];
-			for (int i = 0; i < points.size(); i++){
-				bondDisMtx[i] = new double[points.size()];
-				for (int j = 0; j < points.size(); j++){
-					bondDisMtx[i][j] = lig.bondDisMtx[i][j];
-				}
+			bondDisMtx = new double*[n];
+			for (int i = 0; i < n; i++){
+				bondDisMtx[i] = new double[n];
+				for (int j = 0; j < n; j++) bondDisMtx[i][j] = lig.bondDisMtx[i][j];
 			}
-		}else{
-			bondDisMtx = NULL;
-		}
+		} else bondDisMtx = NULL;
+
+		return *this;
 	}
 	
-	Ligand(){btMtx = NULL;}
+	Ligand(){ btMtx = NULL; bondDisMtx = NULL; }
 	
-	~Ligand(){
-		if (NULL != btMtx){
-			for (int i = 0; i < points.size(); i++){
-				delete[] btMtx[i];
-			}
-			delete[] btMtx;
-			
-			btMtx = NULL;
-		}
-		
-		if (NULL != bondDisMtx){
-			for (int i = 0; i < points.size(); i++){
-				delete[] bondDisMtx[i];
-			}
-			delete[] bondDisMtx;
-			
-			bondDisMtx = NULL;
-		}
-	}
+	~Ligand(){ resetCaches(); }
 	
 	BondType** getBondTypeMtx(){
 		int i;
@@ -454,6 +434,19 @@ public:
 	}
 
 private:
+	void resetCaches(){
+		if (NULL != btMtx){
+			for (int i = 0; i < (int)points.size(); i++) delete[] btMtx[i];
+			delete[] btMtx;
+			btMtx = NULL;
+		}
+		if (NULL != bondDisMtx){
+			for (int i = 0; i < (int)points.size(); i++) delete[] bondDisMtx[i];
+			delete[] bondDisMtx;
+			bondDisMtx = NULL;
+		}
+		vector< vector<BondType> >().swap(atomBondTypes);
+	}
 	BondType toJunDefineBondType(BondType obi, int ring_size){
 		if (SINGLE == obi){
 			if (3 == ring_size){
