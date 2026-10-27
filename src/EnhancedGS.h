@@ -110,7 +110,7 @@ public:
 	~EnhancedGS(){
 		if (0 != rowSortedInds.size()){
 			for (int i = 0; i < rowSortedInds.size(); i++){
-				delete(rowSortedInds[i]);
+				delete[](rowSortedInds[i]);
 				rowSortedInds[i] = NULL;
 			}
 			rowSortedInds.clear();
@@ -151,6 +151,8 @@ private :
 		double oScore = gsPAli->sco;
 
 		if (isTheHighestValuesOfAllRowsSelected(alivec, rownum, colnum)){
+			delete[] alivec;
+			alivec = NULL;
 			return gsPAli;
 		}
 
@@ -264,6 +266,8 @@ private :
 		double oScore = gsPAli->sco;
 
 		if (isTheHighestValuesOfAllRowsSelected(alivec, rownum, colnum)){
+			delete[] alivec;
+			alivec = NULL;
 			return gsPAli;
 		}
 
