@@ -337,7 +337,8 @@ private :
 			if (maxScoreChange > 0.0){
 				oScore += maxScoreChange;
 				alivec[row_ind] = exchange_col_ind;
-				alivec[exchange_row_ind] = col_ind;
+				if (-1 != exchange_row_ind)
+					alivec[exchange_row_ind] = col_ind;
 			}
 		}
 		delete[] descendInds;
