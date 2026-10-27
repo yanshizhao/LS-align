@@ -1,11 +1,11 @@
-  # 构建产物
-  tests/build/
-  *.exe
-  *.o
+# 构建产物
+tests/build/
+*.exe
+*.o
 
-  # 本地工具配置
-  .claude/
+# 本地工具配置
+.claude/
 
-  # 编辑器临时文件
-  *~
-  *.swp
+# 编辑器临时文件
+*~
+*.swp

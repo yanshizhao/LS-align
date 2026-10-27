@@ -1,0 +1,15 @@
+@<TRIPOS>MOLECULE
+UNRELA
+    3     2     0     0     0
+SMALL
+USER_CHARGES
+
+@<TRIPOS>ATOM
+       1C1          0.0000    0.0000    0.0000 C.3
+       2C2          1.5000    0.0000    0.0000 C.3
+       3C3          3.0000    0.0000    0.0000 C.3
+@<TRIPOS>BOND
+     1    1    2 1
+     2    2    3 1
+@<TRIPOS>SUBSTRUCTURE
+     1 UNL         1 GROUP     0       ****  ****  0 ROOT

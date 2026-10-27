@@ -1,0 +1,137 @@
+========================================
+ How to compile the source of LS-align
+========================================
+
+In Linux system, you can compile the LS-align source as
+
+>cd ./src
+
+>g++ LSalign.cpp -o LSalign
+
+or
+
+>g++ -static -O3 -ffast-math -lm -o LSalign LSalign.cpp
+
+----------------------------------------
+ In Windows system (MinGW-w64 / MSYS2)
+----------------------------------------
+Tested with MSYS2/MinGW-w64 g++ 14.2.0 on Windows 11.
+
+Open the "MSYS2 UCRT64" shell (or use Git Bash with the same toolchain on
+PATH), then:
+
+>cd /d/qlab/LSalign_src/LSalign_src20180916/src
+
+>g++ -std=c++98 -O2 -static -o LSalign.exe LSalign.cpp -lm
+
+If you prefer a dynamically linked executable:
+
+>g++ -std=c++98 -O2 -static-libstdc++ -static-libgcc -o LSalign.exe LSalign.cpp -lm
+
+The output is src\LSalign.exe.
+
+Notes on Windows:
+
+ 1. Link the C++ runtime statically (-static, or at least
+    -static-libstdc++ -static-libgcc). If dynamic linking of libstdc++ is
+    broken on your toolchain (collect2 exits with code 116), the plain
+    "g++ LSalign.cpp -o LSalign" command from the Linux section will fail;
+    use one of the two commands above instead.
+
+ 2. g++ needs a writable temporary directory. When TMP/TEMP/TMPDIR are empty
+    (as they are inside a make recipe), g++ falls back to C:\Windows\ and
+    fails with a permission error. Export one explicitly:
+
+      MSYS2 / Git Bash:  export TMP=/c/temp TEMP=/c/temp TMPDIR=/c/temp
+      cmd.exe:           set TMP=C:\temp && set TEMP=C:\temp && set TMPDIR=C:\temp
+
+ 3. Do not use the Visual Studio command prompt unless it is on PATH; cl.exe
+    was not tested here. MinGW-w64 is the supported Windows toolchain.
+
+A test suite (unit + CLI) is provided in ./tests; see tests/README.md.
+It builds the sources itself with the flags above (including the temp-dir
+workaround), and is the quickest way to verify a Windows build:
+
+>cd /d/qlab/LSalign_src/LSalign_src20180916/tests
+
+>make test
+
+========================================
+ How to use LS-align
+========================================
+In Linux system and the right directory, you can run the program in the command window without arguments to obtain a brief instruction
+
+>./LSalign
+
+Here, an example is shown as follows:
+
+>./LSalign ../example/ace_ligands.mol2 ../example/xtal-lig.mol2
+
+----------------------------------------
+ In Windows system
+----------------------------------------
+In cmd.exe, use backslashes and no leading "./" ("./" is a shell syntax
+that cmd.exe does not understand). Run from the directory containing the
+executable:
+
+>cd D:\qlab\LSalign_src\LSalign_src20180916\src
+
+>LSalign.exe
+
+>LSalign.exe ..\example\ace_ligands.mol2 ..\example\xtal-lig.mol2
+
+>LSalign.exe ..\example\xtal-lig.mol2 ..\example\xtal-lig.mol2 -rf 1
+
+In PowerShell, prefix the executable with ".\":
+
+>.\LSalign.exe ..\example\ace_ligands.mol2 ..\example\xtal-lig.mol2
+
+In MSYS2 / Git Bash, use the POSIX form:
+
+>./LSalign.exe ../example/ace_ligands.mol2 ../example/xtal-lig.mol2
+
+NOTE: The program returns exit code 1 even when it succeeds. Do not judge
+success from the exit status ("if errorlevel", "$?", etc.); parse the
+stdout table instead.
+
+
+
+====================
+Output Format
+====================
+QEURY_NAME: the query ligand name
+TEMPL_NAME: the template ligand name
+PC-score8Q:	the PC-score if normalized by atom number of Query Ligand
+PC-score8T: the PC-score if normalized by atom number of Template Ligand
+Pval_PC8Q:	the P-value of PC-score8Q based on statistic (Gumbel distribution)
+Pval_PC8T:	the P-value of PC-score8T based on statistic (Gumbel distribution)
+JaccardR:		the Jaccard ratio of this alignment 
+RMSD_LS:		the RMSD_LS of this alignment
+QUERY_SIZE: The atom number (without 'H') of the query ligand
+TEMPL_SIZE: The atom number (without 'H') of the template ligand
+
+(Some detail definitions can be found at http://zhanglab.ccmb.med.umich.edu/LS-align/ReportParam.html)
+
+====================
+ About this program
+====================
+This program is an implementation of LS-align in C/C++ (Version: J201704171741) by
+
+ Jun Hu at the
+ Yang Zhang lab
+ Center for Computational Medicine and Bioinformatics 
+ University of Michigan 
+ 100 Washtenaw Avenue, Ann Arbor, MI 48109-2218                                                        
+           
+Please report bugs and questions to junh_cs@126.com or hujunum@umich.edu
+
+====================
+ Reference
+====================
+Jun Hu, Zi Liu, Dongjun Yu and Yang Zhang. LS-align: an atom-level, flexible ligand structural alignment algorithm for efficient virtual screening, Bioinformatics, Submitted.
+
+
+====================
+ Acknowledge
+====================
+We thank that Dr.John Kulp helps us to fix the compiled error about the "abs" function, when using the compilers of g++ 8.2.0 and Visual Studio 2017. 

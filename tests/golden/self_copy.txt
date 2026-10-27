@@ -1,0 +1,6 @@
+
+        QEURY_NAME         TEMPL_NAME PC-score8Q PC-score8T  Pval_PC8Q  Pval_PC8T   JaccardR    RMSD_lb    QUERY_SIZE     TEMPL_SIZE 
+                                                                                                         (Without "H")  (Without "H")
+              SELF               COPY     1.0000     1.0000   0.000004   0.000004     1.0000     0.0000              6              6
+
+

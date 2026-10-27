@@ -1,0 +1,19 @@
+@<TRIPOS>MOLECULE
+WEIRD
+    5     4     0     0     0
+SMALL
+USER_CHARGES
+
+@<TRIPOS>ATOM
+       1C1          0.0000    0.0000    0.0000 C.ar
+       2N1          1.4000    0.0000    0.0000 N.am
+       3O1          2.8000    0.0000    0.0000 O.co2
+       4CA          4.2000    0.0000    0.0000 Cl
+       5BR          5.6000    0.0000    0.0000 Br
+@<TRIPOS>BOND
+     1    1    2 1
+     2    2    3 1
+     3    3    4 1
+     4    4    5 1
+@<TRIPOS>SUBSTRUCTURE
+     1 UNL         1 GROUP     0       ****  ****  0 ROOT
