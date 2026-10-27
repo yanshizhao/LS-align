@@ -443,13 +443,17 @@ public:
 		if (0 == finalAlignedPairDist.size()){
 			parseFinalAliInfo();
 		}
-		
-		double ans = 0.0;		
-		for (int i = 0; i < finalAlignedPairDist.size(); i++){
+
+		int n = (int)finalAlignedPairDist.size();
+		if (0 == n)
+			return 0.0;
+
+		double ans = 0.0;
+		for (int i = 0; i < n; i++){
 			ans += finalAlignedPairDist[i] * finalAlignedPairDist[i];
 		}
-		ans = sqrt(ans / finalAlignedPairDist.size());		
-		
+		ans = sqrt(ans / n);
+
 		return ans;
 	}
 
