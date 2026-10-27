@@ -6,6 +6,7 @@
 #include "ShortestRoad.h"
 #include "EnhancedGS.h"
 #include "Evaluation.h"
+#include "AtomFixInfo.h"
 #include <vector>
 #include <string>
 
@@ -198,4 +199,17 @@ XFAIL(ligand_copy_rebuilds_identical_atom_bond_types) {
     /* correct behaviour: dst is a faithful copy of src, caches rebuilt */
     CHECK(dst.size() == 6);
     CHECK(dst.getAtomBondTypes().size() == 6);
+}
+
+/* ---- B18: Ra/Re entries are swapped/duplicated in the mass and vdW tables ---- */
+XFAIL(mass_vdw_table_ra_re) {
+    /* Pre-fix: mass table has Ra=186.2071 / Re=226 (swapped), vdW has Re=2.43
+     * (duplicate of the correct Re=2.05 earlier in the string).  Expected
+     * values come from the periodic table: Ra 226.0254, Re 186.207. */
+    AtomRelativeMass mass;
+    AtomVarDerWaalRadius vdw;
+    CHECK_CLOSE(mass[std::string("Ra")], 226.0, 1.0);
+    CHECK_CLOSE(mass[std::string("Re")], 186.2071, 0.01);
+    CHECK_CLOSE(vdw[std::string("Re")], 2.05, 0.01);
+    CHECK_CLOSE(vdw[std::string("Ra")], 2.43, 0.01);
 }
