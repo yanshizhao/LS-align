@@ -292,6 +292,14 @@ private :
 	double* calculateThreeSpecicalDistPow2(int lig_size, double** p_disPow2Mtx){
 		int i = 0, j = 0;
 
+		double* ans = new double[3];
+		ans[0] = 0.0;
+		ans[1] = 0.0;
+		ans[2] = 0.0;
+
+		if (lig_size < 2)
+			return ans;
+
 		int AInd = -1;
 		int BInd = -1;
 		double disPow2_AB = 0.0;
@@ -305,6 +313,9 @@ private :
 			}
 		}
 		
+		if (AInd < 0 || BInd < 0)
+			return ans;
+
 		double disPow2_ACB = 0.0;
 		double disPow2_AC = 0.0;
 		double disPow2_BC = 0.0;
@@ -319,7 +330,6 @@ private :
 			}
 		}
 
-		double* ans = new double[3];
 		ans[0] = disPow2_AB;
 		ans[1] = disPow2_AC;
 		ans[2] = disPow2_BC;
