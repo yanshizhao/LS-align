@@ -22,6 +22,7 @@
 #include "test_rotamer.cpp"
 #include "test_oracle.cpp"
 #include "test_xfail.cpp"
+#include "test_delete_mismatch.cpp"
 
 int main() {
     return ::minitest::run();

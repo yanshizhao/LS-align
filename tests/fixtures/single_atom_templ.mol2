@@ -1,0 +1,11 @@
+@<TRIPOS>MOLECULE
+SINGLEATOM
+    1     0     0     0     0
+SMALL
+USER_CHARGES
+
+@<TRIPOS>ATOM
+       1C1          0.0000    0.0000    0.0000 C.3
+@<TRIPOS>BOND
+@<TRIPOS>SUBSTRUCTURE
+     1 UNL         1 GROUP     0       ****  ****  0 ROOT
