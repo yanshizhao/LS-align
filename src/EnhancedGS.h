@@ -440,6 +440,9 @@ private :
 		
 		return ans;
 	}
+
+	EnhancedGS(const EnhancedGS&);
+	EnhancedGS& operator=(const EnhancedGS&);
 };
 
 #endif

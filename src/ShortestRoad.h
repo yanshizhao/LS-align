@@ -155,6 +155,8 @@ private:
 		}
 	}
 	
+	ShortestRoad(const ShortestRoad&);
+	ShortestRoad& operator=(const ShortestRoad&);
 };
 
 #endif

@@ -763,6 +763,8 @@ private:
 		return singleBond;                                                                                                         
 	} 
 	
+	LigRotamerDetector(const LigRotamerDetector&);
+	LigRotamerDetector& operator=(const LigRotamerDetector&);
 };
 
 #endif

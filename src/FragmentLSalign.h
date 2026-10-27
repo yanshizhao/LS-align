@@ -584,6 +584,8 @@ private:
 		return false;
 	}	
 
+	FragmentLSalign(const FragmentLSalign&);
+	FragmentLSalign& operator=(const FragmentLSalign&);
 };
 
 #endif

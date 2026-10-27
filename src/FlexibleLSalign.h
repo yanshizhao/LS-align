@@ -393,6 +393,9 @@ private :
 
 		return p_disPow2Mtx;
 	}
+
+	FlexibleLSalign(const FlexibleLSalign&);
+	FlexibleLSalign& operator=(const FlexibleLSalign&);
 };
 
 #endif 
