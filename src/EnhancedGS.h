@@ -89,17 +89,34 @@ private:
 	vector<vector<double> >	scoMtx;
 	vector<int*> rowSortedInds;		// temp save the sort row content, the vector size is equal to the row of scoMtx
 	AlignInfo* pAli;			// the align information in scoMtx
+
+	bool isEmptyScoreMtx() const {
+		if (scoMtx.empty()) return true;
+		if (scoMtx[0].empty()) return true;
+		return false;
+	}
+
 public:
 	EnhancedGS(vector<vector<double> > scoMtx){
 		this->scoMtx = scoMtx;
-		
+		pAli = NULL;
+		if (isEmptyScoreMtx()){
+			pAli = new AlignInfo(0.0, NULL, 0);
+			return;
+		}
+
 		pAli = enhanceGreedySeach();
 //		pAli = LoopEnhanceGreedySearch();
 	}
 
 	EnhancedGS(vector<vector<double> > scoMtx, int type){
 		this->scoMtx = scoMtx;
-		
+		pAli = NULL;
+		if (isEmptyScoreMtx()){
+			pAli = new AlignInfo(0.0, NULL, 0);
+			return;
+		}
+
 		if (0 == type){
 			pAli = greedySearch();			
 		}else if (1 == type){

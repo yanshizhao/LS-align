@@ -919,8 +919,12 @@ private:
 					minValEachElement = overlapScore;
 
 				double overlapScore_for_final_sco = p_Ali->sco;
-				double jaccardRatio_for_final_sco = 1.0*overlapScore_for_final_sco / 
-					(ithQAtomScore_for_final_sco + jthTAtomScore_for_final_sco - overlapScore_for_final_sco);
+				double denom = ithQAtomScore_for_final_sco
+				             + jthTAtomScore_for_final_sco
+				             - overlapScore_for_final_sco;
+				double jaccardRatio_for_final_sco = (denom > 0.0)
+				                                  ? (overlapScore_for_final_sco / denom)
+				                                  : 0.0;
 				qRow_for_final_sco.push_back(jaccardRatio_for_final_sco);
 			}// end for j
 
