@@ -1,6 +1,7 @@
 #include "mini_test.h"
 #include "leak_probe.h"
 #include "Ligands.h"
+#include <float.h>
 #include <string>
 #include <vector>
 
@@ -20,7 +21,8 @@ TEST(ligands_atom_type_reduced_to_element) {
     /* getLigands() returns const& -- the copy below is a deliberate snapshot */
     std::vector<Ligand> all = ligs.getLigands();
     Ligand& L = all[0];
-    /* C.ar -> C, N.am -> N, O.co2 -> O, Cl -> CL, Br -> BR (uppercased) */
+    /* Fixed columns take columns 48-49 ("C.", "N.", "O.", "Cl", "Br");
+     * the trailing .ar/.am/.co2 is outside the sliced field. */
     CHECK(L.getAtomType(0) == "C");
     CHECK(L.getAtomType(1) == "N");
     CHECK(L.getAtomType(2) == "O");
@@ -420,4 +422,72 @@ TEST(f15_index_oob_guard) {
     CHECK(L.getBondInfoes().size() == 1);
     /* the out-of-range bond keeps its previous length; nothing was read */
     CHECK_CLOSE(L.getBondInfoes()[0].bondDis, 1.5, 0.0);
+}
+
+/* ---- T-021F1: format2PDB must survive extreme finite coordinates ----
+ * The line buffer used to be 256 bytes with an unbounded sprintf: "%8.3f"
+ * alone prints up to 313 characters for a finite double, so three huge
+ * coordinates wrote past the stack buffer (SIGSEGV under -o).  The buffer is
+ * back to 1000 bytes with snprintf. */
+static Ligand makeOneAtomLigand(double x, double y, double z) {
+    std::vector<Point3D> pts;
+    pts.push_back(Point3D(x, y, z));
+    std::vector<std::string> types;
+    types.push_back("C");
+    std::vector<std::string> names;
+    names.push_back("C1");
+    std::vector<BondInfo> bonds;           /* no bonds: the atom stands alone */
+    return Ligand("HUGE", pts, types, bonds, names);
+}
+
+TEST(pdb_huge_coordinates_do_not_overflow) {
+    const double huge[3] = {1e300, -1e300, DBL_MAX};
+    for (int k = 0; k < 3; ++k) {
+        Ligand L = makeOneAtomLigand(huge[k], huge[k], huge[k]);
+        /* format2PDB is public; an overflow here would smash the stack */
+        std::vector<std::string> rows = L.format2PDB("QUE", 1, 88888);
+        CHECK(rows.size() == 2);
+        CHECK(rows[0].size() == 78);           /* line width is fixed */
+        CHECK(rows[0].substr(12, 4) == " C1 "); /* name column survives */
+        CHECK(rows[0].substr(17, 3) == "QUE");  /* residue column intact */
+        CHECK(rows[0].substr(76, 2) == " C");   /* element column added */
+        CHECK(rows[1] == "TER");
+    }
+}
+
+TEST(pdb_normal_coordinates_keep_the_documented_layout) {
+    Ligand L = makeOneAtomLigand(1.4, 0.0, 0.0);
+    std::vector<std::string> rows = L.format2PDB("QUE", 1, 88888);
+    CHECK(rows.size() == 2);
+    /* exact historical layout: format string and columns are unchanged */
+    CHECK(rows[0] ==
+          "HETATM    1  C1  QUE 88888       1.400   0.000   0.000  1.00  0.00           C");
+    CHECK(rows[0].size() == 78);
+    CHECK(rows[0].substr(30, 8) == "   1.400");
+    CHECK(rows[0].substr(54, 10) == "  1.00  0.");
+    CHECK(rows[1] == "TER");
+}
+
+/* ---- T-021F1: fixed-column and tokenised parse reduce the same element ----
+ * fixtures/weird_cols.mol2 is the fixed-column layout; fixtures/weird_tokens.mol2
+ * carries the same molecule whitespace separated.  Both must now reduce the
+ * type tokens (C.ar/N.am/O.co2/Cl/Br) to the same element symbols. */
+TEST(ligands_token_and_fixed_columns_reduce_the_same_element) {
+    Ligands fixed("fixtures/weird_cols.mol2", false);
+    Ligands tokens("fixtures/weird_tokens.mol2", false);
+    CHECK(fixed.size() == 1 && tokens.size() == 1);
+    Ligand a = fixed[0];
+    Ligand b = tokens[0];
+    CHECK(a.size() == b.size());
+    CHECK(a.size() == 5);
+    for (int i = 0; i < 5; ++i) {
+        CHECK(b.getAtomType(i) == a.getAtomType(i));
+        CHECK(b.getAtomName(i) == a.getAtomName(i));
+        CHECK_CLOSE(b.getIthPoints(i)[0], a.getIthPoints(i)[0], 1e-6);
+    }
+    CHECK(a.getAtomType(0) == "C");   /* both read "C." from C.ar */
+    CHECK(a.getAtomType(1) == "N");
+    CHECK(a.getAtomType(2) == "O");
+    CHECK(a.getAtomType(3) == "CL");
+    CHECK(a.getAtomType(4) == "BR");
 }

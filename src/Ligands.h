@@ -401,6 +401,7 @@ public:
 		int i = 0;
 		vector<string> ans;
 		char lt[4];
+		int clipped = 0;
 		for (i = 0; i < 3; i++){
 			if (i < ligtype.size()){
 				lt[i] = ligtype[i];
@@ -413,11 +414,16 @@ public:
 		for (i = 0; i < points.size(); i++){
 			string elem = (atomtypes[i].size() > 2) ? atomtypes[i].substr(0, 2) : atomtypes[i];
 			string nameField = fitPdbAtomName(getAtomName(i), elem);
-			char buf[256];
-			sprintf(buf, "HETATM %4d %s %3s %5d    %8.3f%8.3f%8.3f  1.00  0.00",
+			/* 1000 bytes hold every finite double: "%8.3f" is at most 310
+			 * characters, so three coordinates plus the fixed columns fit. */
+			char buf[1000];
+			int n = snprintf(buf, sizeof(buf), "HETATM %4d %s %3s %5d    %8.3f%8.3f%8.3f  1.00  0.00",
 				(i+atom_start_index), nameField.c_str(), lt, mol_no,
 				points[i][0], points[i][1], points[i][2]);
 			string line(buf);
+			if (n < 0 || n >= (int)sizeof(buf) || line.size() > 76){
+				clipped++;
+			}
 			line.resize(76, ' ');
 			if (2 == elem.size()){
 				line += elem;
@@ -427,6 +433,10 @@ public:
 				line += "  ";
 			}
 			ans.push_back(line);
+		}
+		if (clipped > 0){
+			cerr << "LSalign: WARNING: " << clipped << " PDB record(s) for ligand \""
+				<< ligname << "\" exceed 78 columns; coordinates may be truncated." << endl;
 		}
 		ans.push_back("TER");
 		
@@ -630,6 +640,18 @@ private:
 		return ans;
 	}
 
+	/* Fixed columns (from column 47) and the tokenised fallback (the whole
+	 * type token) both take at most two characters, skip a blank leading
+	 * column, strip decoration and uppercase, so the two layouts reduce the
+	 * same element for the same input. */
+	static string reduceAtomType(const string& src, size_t offset){
+		string field = src.substr(offset, 2);
+		if (0 == field.compare(0, 1, " ")){
+			field = src.substr(offset + 1, 2);
+		}
+		return reduceToElement(field);
+	}
+
 	static string elementFromAtomName(const string& atomName){
 		string elem;
 		for (int i = 0; i < (int)atomName.size(); i++){
@@ -666,11 +688,7 @@ private:
 				y = strtod(trimWhitespace(sy).c_str(), NULL);
 				z = strtod(trimWhitespace(sz).c_str(), NULL);
 				atomName = trimWhitespace(record.substr(8, 8));
-				atomType = record.substr(47, 2);
-				if (atomType.compare(0, 1, " ") == 0){
-					atomType = record.substr(48, 2);
-				}
-				atomType = reduceToElement(atomType);
+				atomType = reduceAtomType(record, 47);
 				if (atomType.empty()){
 					atomType = elementFromAtomName(atomName);
 				}
@@ -687,8 +705,11 @@ private:
 			x = strtod(tokens[2].c_str(), NULL);
 			y = strtod(tokens[3].c_str(), NULL);
 			z = strtod(tokens[4].c_str(), NULL);
-			atomType = (tokens.size() >= 6) ? reduceToElement(tokens[5])
+			atomType = (tokens.size() >= 6) ? reduceAtomType(tokens[5], 0)
 				: elementFromAtomName(atomName);
+			if (atomType.empty()){
+				atomType = elementFromAtomName(atomName);
+			}
 			return true;
 		}
 
