@@ -43,7 +43,7 @@ $(shell mkdir -p $(TMPDIR_X) $(BUILD) 2>/dev/null)
 # Windows exec suffix (MSYS make maps this); empty on Linux.
 EXE := .exe
 
-.PHONY: all test unit unit-assert cli cli-assert asan golden check-golden clean help
+.PHONY: all test unit unit-assert cli cli-assert asan golden check-golden output-diff output-baseline clean help
 
 all: unit cli
 
@@ -54,6 +54,8 @@ help:
 	@echo "make asan        - build with ASan/UBSan & run leak/UB checks (xfail)"
 	@echo "make golden      - (re)generate golden snapshots"
 	@echo "make check-golden- diff current output against golden snapshots"
+	@echo "make output-diff   - full output-level regression vs output_diff/baseline"
+	@echo "make output-baseline - (re)generate output_diff/baseline from current build"
 	@echo "make clean       - remove build artifacts"
 
 test: unit cli
@@ -124,6 +126,16 @@ golden: $(BUILD)/LSalign_under_test$(EXE)
 
 check-golden: $(BUILD)/LSalign_under_test$(EXE)
 	@bash cli/check_golden.sh
+
+# --------------------------------------------------------------------------- #
+# Full output-level regression (output_diff/): wider case set than golden/,
+# exact vs expected modes, per-case diffs.  See output_diff/README.md.
+# --------------------------------------------------------------------------- #
+output-baseline: $(BUILD)/LSalign_under_test$(EXE)
+	@python output_diff/output_diff.py --baseline
+
+output-diff: $(BUILD)/LSalign_under_test$(EXE)
+	@python output_diff/output_diff.py
 
 clean:
 	rm -rf $(BUILD)/unit$(EXE) $(BUILD)/unit_asan$(EXE) $(BUILD)/LSalign_under_test$(EXE) \

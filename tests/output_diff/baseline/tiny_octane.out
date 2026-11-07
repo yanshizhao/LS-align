@@ -1,0 +1,4 @@
+
+        QEURY_NAME         TEMPL_NAME PC-score8Q PC-score8T  Pval_PC8Q  Pval_PC8T   JaccardR    RMSD_lb    QUERY_SIZE     TEMPL_SIZE 
+                                                                                                         (Without "H")  (Without "H")
+              TINY             OCTANE     0.5661     0.2830   0.000666   0.018588     0.0000     2.1093              4              8
