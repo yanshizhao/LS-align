@@ -734,8 +734,26 @@ private:
 		}
 		// Code added by Jun at 20180915 END
 		
+		// B33: a partition that misses atoms (e.g. a disconnected ligand) must
+		// never be rotated -- rotating it would drop those atoms downstream.
+		// Only publish the split when both sides together cover every atom.
+		int numCovered = 0;
+		vector<bool> isCovered(node_num, false);
+		for (i = 0; i < (int)firstPartAtomInds.size(); i++){
+			if (!isCovered[firstPartAtomInds[i]]){
+				isCovered[firstPartAtomInds[i]] = true;
+				numCovered++;
+			}
+		}
+		for (i = 0; i < (int)secondPartAtomInds.size(); i++){
+			if (!isCovered[secondPartAtomInds[i]]){
+				isCovered[secondPartAtomInds[i]] = true;
+				numCovered++;
+			}
+		}
+
 		vector<vector<int> > ans;           
-		if (isRotatable){                                                                                    
+		if (isRotatable && numCovered == node_num){                                                                                    
 			ans.push_back(firstPartAtomInds);
 			ans.push_back(secondPartAtomInds);  
 		}  
