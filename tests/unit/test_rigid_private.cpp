@@ -382,3 +382,82 @@ TEST(p2_copy_preserves_flag) {
     CHECK(copy.alisco == -7.0);
     CHECK(copy.p_AliInfo->sco == -7.0);
 }
+
+/* F9: the copy constructor used to copy rough_sliding_step but not
+ * detail_sliding_step, leaving the copy with an uninitialised increment for
+ * align()'s detail pass.  align() is not reachable on a copy today, so the
+ * copy is the only observable place; it must carry the source's value. */
+TEST(f9_detail_step_copied) {
+    Ligands ligs("fixtures/self.mol2", false);
+    RigidLSalign src(ligs[0], ligs[0], 2.0, 3, 7);
+    CHECK(src.rough_sliding_step == 3);
+    CHECK(src.detail_sliding_step == 7);
+
+    RigidLSalign copy(src);
+    CHECK(copy.rough_sliding_step == 3);
+    CHECK(copy.detail_sliding_step == 7);
+
+    /* deep copy stays deep: the two AlignInfo objects are distinct */
+    CHECK(copy.p_AliInfo != src.p_AliInfo);
+}
+
+/* F3: copying an object whose p_AliInfo is NULL used to dereference the NULL
+ * pointer (`new AlignInfo(*NULL)`) and crash.  The copy must be a valid object
+ * with a NULL p_AliInfo, and every score accessor on it must return a safe
+ * value instead of crashing. */
+TEST(f3_copy_null_safe) {
+    Ligands a("fixtures/unrelatedA.mol2", false);
+    Ligands b("fixtures/unrelatedB.mol2", false);
+    RigidLSalign src(a[0], b[0], 0.1);
+    CHECK(src.p_AliInfo != NULL);
+    CHECK(src.getFinalAlignedPair().empty());
+
+    AlignInfo* saved = src.p_AliInfo;
+    src.p_AliInfo = NULL;
+
+    RigidLSalign copy(src);
+    CHECK(copy.p_AliInfo == NULL);
+    CHECK(copy.getLSscore() == 0.0);
+    CHECK(copy.getLSscore8QuerySize() == 0.0);
+    CHECK(copy.getLSscore8TemplSize() == 0.0);
+    CHECK(copy.getFinalAlignedPair().empty());
+    CHECK(copy.getFinalAlignedPairDist().empty());
+    CHECK(copy.getAlignedRMSD() == 0.0);
+    CHECK(copy.getJaccardRatio() == 0.0);
+    CHECK(copy.toStrVec().size() == 7);
+    CHECK(copy.formatAliInfo().empty());
+
+    src.p_AliInfo = saved;
+}
+
+/* F3: with p_AliInfo NULL the parse guard must make every downstream entry
+ * point safe.  The object is unusable, so the guard leaves the parsed flag
+ * alone (false): no false "already settled" state, no crash, scores are 0. */
+TEST(f3_accessors_null_safe) {
+    Ligands ligs("fixtures/self.mol2", false);
+    RigidLSalign ali(ligs[0], ligs[0], 2.0);
+
+    AlignInfo* saved = ali.p_AliInfo;
+    ali.p_AliInfo = NULL;
+    ali.m_isFinalParsed = false;
+    ali.finalAlignedPair.clear();
+    ali.finalAlignedPairDist.clear();
+    ali.alisco = -1.0;
+
+    CHECK(ali.getLSscore() == 0.0);
+    CHECK(ali.getLSscore8QuerySize() == 0.0);
+    CHECK(ali.getLSscore8TemplSize() == 0.0);
+    CHECK(ali.getFinalAlignedPair().empty());
+    CHECK(ali.getFinalAlignedPairDist().empty());
+    CHECK(ali.getAlignedRMSD() == 0.0);
+    CHECK(ali.getJaccardRatio() == 0.0);
+    CHECK(ali.getAliSco() == -1.0);
+    CHECK(ali.toStrVec().size() == 7);
+    CHECK(ali.formatAliInfo().empty());
+
+    /* the guard does not claim settlement on an unusable object */
+    CHECK(!ali.m_isFinalParsed);
+
+    ali.p_AliInfo = saved;
+    CHECK(ali.getLSscore() > 0.0);
+}
