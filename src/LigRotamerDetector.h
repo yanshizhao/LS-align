@@ -276,7 +276,7 @@ private:
 			N = NRS_MIN_ROTATABLE_BOND_NUM;
 		}
 
-		int i = 0, j = 0;
+		int i = 0;
 		vector<int> ans;
 		if (N >= singleBonds.size()){
 			for (i = 0; i < singleBonds.size(); i++)
@@ -284,8 +284,7 @@ private:
 			return ans;
 		}
 
-		vector<int> samllPartAtomNums; 
-		vector<int> smallPartAtomInds;	// content just 0 / 1
+		vector<int> samllPartAtomNums;
 		for (i = 0; i < singleBonds.size(); i++){
 			if (i >= (int)twoPartsIndss.size() || twoPartsIndss[i].size() < 2){
 				cerr << "ERROR: rotamer sampling: bond " << i
@@ -294,16 +293,13 @@ private:
 			}
 			int aPartAtomNum = twoPartsIndss[i][0].size();
 			int bPartAtomNum = twoPartsIndss[i][1].size();
-			
+
 			int smallAtomNum = aPartAtomNum;
-			int smallPartAtomInd = 0;
 			if (aPartAtomNum > bPartAtomNum){
 				smallAtomNum = bPartAtomNum;
-				smallPartAtomInd = 1;
 			}
 
 			samllPartAtomNums.push_back(smallAtomNum);
-			smallPartAtomInds.push_back(smallPartAtomInd);
 		}
 
 		int* index = ascentInsertSortIndex(samllPartAtomNums);
@@ -314,31 +310,8 @@ private:
 		}
 
 		vector<int> sortedSIInds;
-		sortedSIInds.push_back(index[0]);
-		sortedSIInds.push_back(index[1]);
-
-		for (i = 2; i < samllPartAtomNums.size(); i++){
-			vector<int> ithSmallPartAtomInds = twoPartsIndss[index[i]][smallPartAtomInds[index[i]]];
-			for (j = 0; j < i; j++){
-				vector<int> jthSmallPartAtomInds = twoPartsIndss[index[j]][smallPartAtomInds[index[j]]];
-
-				bool isOverlap = false;
-				for (int k = 0; k < ithSmallPartAtomInds.size(); k++){
-					for (int l = 0; l < jthSmallPartAtomInds.size(); l++){
-						if (ithSmallPartAtomInds[k] == jthSmallPartAtomInds[l]){
-							isOverlap = true;
-							break;
-						}
-					}
-					if (true == isOverlap){
-						break;
-					}
-				}
-				if (false == isOverlap)
-					break;
-			}
-			
-			sortedSIInds.insert(sortedSIInds.begin()+j, *(index+i));
+		for (i = 0; i < (int)samllPartAtomNums.size(); i++){
+			sortedSIInds.push_back(index[i]);
 		}
 
 		int step = singleBonds.size() / N;

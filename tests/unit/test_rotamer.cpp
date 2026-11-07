@@ -68,8 +68,9 @@ TEST(shortestroad_longest_path_on_octane) {
 /* B26: the uniform-distribution sampler used to read
  * sortedSIInds[i*step + i] unconditionally, which is out of range for
  * i >= mod when i*step + i >= s (chain_c13: s=6; i=3 reads [6], i=4 reads
- * [8] for N=5).  The out-of-range value was always overwritten by the
- * i*step + mod pick before use, so the selected indices are unchanged.
+ * [8] for N=5).  The out-of-range value was always discarded in favour of the
+ * i*step + mod pick, so B26 alone was value-preserving; B30 later changed the
+ * candidate list itself (see b30_sorted_indices_ascending_cost).
  * This helper exposes the private sampler; it must never read out of range. */
 static std::vector<int> b26SelectC13(int N, int& bondCount) {
     Ligands ligs("fixtures/chain_c13.mol2", false);
@@ -101,22 +102,104 @@ TEST(b26_c13_no_abort) {
         CHECK(sel5[i] >= 0 && sel5[i] < s);
 }
 
-TEST(b26_indices_identical) {
-    /* Values measured on chain_c13 (s=6): pre-fix and post-fix sequences are
-     * bit-identical because the out-of-range read was always discarded. */
-    int s = 0;
-    std::vector<int> sel3 = b26SelectC13(3, s);
-    CHECK(sel3.size() == 3);
-    CHECK(sel3.size() == 3 && sel3[0] == 3 && sel3[1] == 2 && sel3[2] == 0);
-
-    std::vector<int> sel5 = b26SelectC13(5, s);
-    CHECK(sel5.size() == 5);
-    CHECK(sel5.size() == 5 && sel5[0] == 3 && sel5[1] == 2
-          && sel5[2] == 1 && sel5[3] == 0 && sel5[4] == 5);
+TEST(b26_pick_in_range_across_sizes) {
+    /* B26: for i >= mod the old read sortedSIInds[i*step + i] went past the end
+     * of the candidate list (chain_c13: s=6; i=3 reads [6], i=4 reads [8] for
+     * N=5) and was always discarded in favour of the i*step + mod pick.  This
+     * locks the fixed arithmetic for every (s, N) the sampler can see: it must
+     * stay inside [0, s), independently of how the candidate list is ordered.
+     * (The sampled values themselves are locked by b30_sorted_indices_ascending_cost.) */
+    bool allInRange = true;
+    for (int s = 1; s <= 200; ++s) {
+        for (int N = 3; N <= 20 && N < s; ++N) {
+            int step = s / N;
+            int mod = s % N;
+            for (int i = 0; i < N; ++i) {
+                int pick = (i >= mod) ? (i*step + mod) : (i*step + i);
+                if (pick < 0 || pick >= s) allInRange = false;
+            }
+        }
+    }
+    CHECK(allInRange);
 }
 
-/* F8: the magic numbers are named; the values must stay identical to the
- * literals they replaced (behaviour-preserving refactor). */
+/* B30: the candidate list used to be built by the broken j-overlap loop, which
+ * compared bonds at fixed-table indices (index[j]) but inserted at list
+ * positions (begin()+j), reversing the cost order for real ligands.  The list
+ * is now exactly the ascending cost table index[], so the sampler must:
+ *   - with N >= s return every bond 0..s-1 in ascending order (early branch);
+ *   - with small N return only bonds from the cheapest prefix, in strict
+ *     non-decreasing cost order;
+ *   - be deterministic.
+ * chain_c13: s=6 with costs {4,5,6,6,5,4} -> index = [0,5,4,1,2,3];
+ * N=3 picks (step=2, mod=0) = positions {0,2,4} -> bonds {0,4,2} with costs
+ * {4,5,6}.  Measured, not estimated. */
+static int b30SmallSideCost(std::vector<std::vector<std::vector<int> > >& twoPartsIndss, int bondInd) {
+    int a = (int)twoPartsIndss[bondInd][0].size();
+    int b = (int)twoPartsIndss[bondInd][1].size();
+    return a > b ? b : a;
+}
+
+TEST(b30_sorted_indices_ascending_cost) {
+    Ligands ligs("fixtures/chain_c13.mol2", false);
+    std::vector<Ligand> all = ligs.getLigands();
+    LigRotamerDetector rd(all[0]);
+    std::vector<BondInfo> singleBonds = rd.findAllSingleBond();
+    std::vector<std::vector<std::vector<int> > > twoPartsIndss =
+        rd.getUsefulBondTwoPartIndsInfo(&singleBonds);
+    const int s = (int)singleBonds.size();
+    CHECK(s == 6);
+
+    std::vector<int> costs;
+    for (int k = 0; k < s; ++k)
+        costs.push_back(b30SmallSideCost(twoPartsIndss, k));
+    CHECK(costs.size() == 6 && costs[0] == 4 && costs[1] == 5 && costs[2] == 6
+          && costs[3] == 6 && costs[4] == 5 && costs[5] == 4);
+
+    /* N >= s: every bond, in ascending index order */
+    std::vector<int> allSel = rd.select_N_RotableSingleBondOnUniformDistribution(
+        twoPartsIndss, singleBonds, s);
+    CHECK((int)allSel.size() == s);
+    for (int k = 0; k < s; ++k)
+        CHECK(allSel[k] == k);
+
+    /* small N: only cheapest-prefix bonds, sampled in non-decreasing cost order */
+    std::vector<int> sel3 = rd.select_N_RotableSingleBondOnUniformDistribution(
+        twoPartsIndss, singleBonds, NRS_ROTATABLE_BOND_NUM);
+    CHECK((int)sel3.size() == NRS_ROTATABLE_BOND_NUM);
+    CHECK(sel3.size() == 3 && sel3[0] == 0 && sel3[1] == 4 && sel3[2] == 2);
+    CHECK(costs[sel3[0]] == 4 && costs[sel3[1]] == 5 && costs[sel3[2]] == 6);
+    for (std::size_t i = 1; i < sel3.size(); ++i)
+        CHECK(costs[sel3[i-1]] <= costs[sel3[i]]);
+    /* the result must be exactly index[] sampled at the B26 pick positions:
+     * that is the definition of "candidate list == pure ascending cost table".
+     * The old j-overlap list violated it (e.g. it yielded bonds {1,2,0}). */
+    int* index = ascentInsertSortIndex(costs);
+    int step = s / NRS_ROTATABLE_BOND_NUM;
+    int mod = s % NRS_ROTATABLE_BOND_NUM;
+    for (int i = 0; i < NRS_ROTATABLE_BOND_NUM; ++i) {
+        int pick = (i >= mod) ? (i*step + mod) : (i*step + i);
+        CHECK(sel3[i] == index[pick]);
+    }
+    delete[] index;
+
+    /* the N=5 path still returns s in-range indices, in cost order */
+    std::vector<int> sel5 = rd.select_N_RotableSingleBondOnUniformDistribution(
+        twoPartsIndss, singleBonds, NRS_LEGACY_UNPARAM_BOND_NUM);
+    CHECK((int)sel5.size() == NRS_LEGACY_UNPARAM_BOND_NUM);
+    CHECK(sel5.size() == 5 && sel5[0] == 0 && sel5[1] == 4 && sel5[2] == 1
+          && sel5[3] == 2 && sel5[4] == 3);
+    for (std::size_t i = 0; i < sel5.size(); ++i)
+        CHECK(sel5[i] >= 0 && sel5[i] < s);
+    for (std::size_t i = 1; i < sel5.size(); ++i)
+        CHECK(costs[sel5[i-1]] <= costs[sel5[i]]);
+
+    /* determinism: same input, same answer */
+    std::vector<int> again = rd.select_N_RotableSingleBondOnUniformDistribution(
+        twoPartsIndss, singleBonds, NRS_ROTATABLE_BOND_NUM);
+    CHECK(again == sel3);
+}
+
 TEST(f8_macro_values) {
     CHECK(NRS_ROTATABLE_BOND_NUM == 3);
     CHECK(NRS_MIN_ROTATABLE_BOND_NUM == 3);
@@ -490,7 +573,7 @@ TEST(x1_deterministic_decimation) {
     RigidLSalign rigid = emptyRigidAlignment();
 
     /* (a) public path: 11 detail angles, N=3 -> 11^3 = 1331, no decimation.
-     * Three runs must be identical.  Measured: 342 non-overlapping conformers
+     * Three runs must be identical.  Measured: 338 non-overlapping conformers
      * (the rest are rejected by judgeIsOverlapAtomsInLig). */
     LigRotamerDetector rd1(L, true, true);
     std::vector<Ligand> r1 = rd1.generateRotamers(&rigid);
@@ -502,11 +585,11 @@ TEST(x1_deterministic_decimation) {
     CHECK(!r1.empty());
     CHECK(x1SameRotamerSets(r1, r2));
     CHECK(x1SameRotamerSets(r1, r3));
-    CHECK(r1.size() == 342);            /* measured, not estimated */
+    CHECK(r1.size() == 338);            /* measured, not estimated */
     CHECK(r1.size() <= 5000);           /* below the decimation cap */
 
     /* (b) white-box: 20 angles -> 8000 > 5000, so the decimation branch runs.
-     * Two runs must still be identical.  Measured: 1139 conformers. */
+     * Two runs must still be identical.  Measured: 1111 conformers. */
     LigRotamerDetector d1(L, true, true);
     for (int e = 0; e < 9; ++e)
         d1.rotAngles.push_back((25.0 + 20.0 * e) / 360.0 * DOUBLE_PI);
@@ -520,7 +603,7 @@ TEST(x1_deterministic_decimation) {
 
     CHECK(!q1.empty());
     CHECK(x1SameRotamerSets(q1, q2));
-    CHECK(q1.size() == 1139);           /* measured, not estimated */
+    CHECK(q1.size() == 1111);           /* measured, not estimated */
     CHECK(q1.size() <= 5000);           /* decimation cap holds */
 
     /* the decimation arithmetic for 8000 records capped at 5000: iter 1..4999
