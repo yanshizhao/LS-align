@@ -46,8 +46,9 @@ void print_help(char* arg){
 		 << "                 2          : Fragment mode (not implemented in this build; rejected)" << endl
 		 << "       -md   Only if \"-rf\" is be set 1, it is useful. It will control whether using more detail" << endl
 		 << "             rotated angles of single bond to generate more rotamers of query ligand(s) or not." << endl
-		 << "                 0 (default): use Raw rotated angle vector"<< endl
-		 << "                 1          : use Detail rotated angle vector" << endl
+		 << "                 0 (default): use the raw 5-angle set per bond"<< endl
+		 << "                 1          : use the detail 11-angle set per bond"<< endl
+		 << "                              (adds +-180, +-90, +-30 degrees)" << endl
 		 << "       -d0   Set the d0 value of PC-score (suggestted value is 1.0 or 2.0 angstrom)" << endl
 		 << "             warning: its value range from [0.1, 4] angstrom. " << endl
 		 << "             default: d0 = 0.55 * pow(Nmin - 9, 1.0/3.0) + 0.15. " << endl
