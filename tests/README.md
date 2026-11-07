@@ -8,10 +8,11 @@ and full design.
 
 ```bash
 make test          # unit + cli  (default CI target; no DUD-E dataset, no ASan)
-make unit          # white-box unit tests (46 passed, 0 xfail, 0 xpass)
-make cli           # black-box CLI tests
+make unit          # white-box unit tests (48 passed, 0 xfail, 0 xpass)
+make cli           # black-box CLI tests (6 scripts)
 make golden        # regenerate golden snapshots
 make check-golden  # diff current output vs golden
+make output-diff   # output_diff: stdout/stderr compared separately, 11 cases
 ```
 
 Optional (needs the ~6.9 GB DUD-E dataset at `../dataset`, referenced not copied):
@@ -27,7 +28,9 @@ bash dataset_tools/audit_ace.sh ace 200
   a writable temp dir so g++ does not fall back to `C:\Windows\`.
 - ASan/UBSan are unavailable (no MinGW libasan runtime). Leak checks use the
   portable `leak_probe.h` counter instead.
-- The LS-align binary **always exits 1**, so tests parse stdout, never `$?`.
+- Exit code: **0 on success, 1 on failure** (B28).  Numeric assertions still parse
+  stdout because the table is the contract; `cli/test_cli_args.sh` covers exit
+  codes, invalid option values and stdout purity explicitly.
 
 ## xfail convention
 

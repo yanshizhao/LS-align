@@ -90,9 +90,10 @@ In MSYS2 / Git Bash, use the POSIX form:
 
 >./LSalign.exe ../example/ace_ligands.mol2 ../example/xtal-lig.mol2
 
-NOTE: The program returns exit code 1 even when it succeeds. Do not judge
-success from the exit status ("if errorlevel", "$?", etc.); parse the
-stdout table instead.
+Exit status: 0 on success, 1 on failure (invalid options, unreadable input,
+out-of-range -oq/-ot, ...).  Diagnostic messages go to stderr; the result
+table is the only thing written to stdout.  The scripted tests parse the
+stdout table and check the exit status separately.
 
 
 

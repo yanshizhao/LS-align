@@ -85,10 +85,10 @@ c_row="$(awk '$1=="EMPTYLIG" {print $3, $4, $5, $6, $7, $8; exit}' "${c_out_f}")
 c_err="$(cat "${c_err_f}")"
 rm -f "${c_out_f}" "${c_err_f}"
 
-if [ "${c_rc}" -eq 139 ] || [ "${c_rc}" -eq 127 ]; then
-    bad "C: crashed (exit ${c_rc})"
+if [ "${c_rc}" -eq 0 ]; then
+    ok "C: exit 0 (zero-atom ligand is handled, not a failure)"
 else
-    ok "C: no crash (exit ${c_rc})"
+    bad "C: exit ${c_rc} (expected 0)"
 fi
 assert_eq "C: PC-score8Q" "$(printf '%s
 ' "${c_row}" | awk '{print $1}')" "0.0000"

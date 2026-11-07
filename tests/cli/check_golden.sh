@@ -13,7 +13,7 @@ rc=0
 gen() {   # $1 = output file, rest = args
     # strip the three variable timing lines ("Using ...-s", "Totally Using ...")
     "${BIN}" "${@:2}" 2>/dev/null \
-      | grep -vE '^(Using|Totally Using) ' > "$1" || true   # binary always exits 1
+      | grep -vE '^(Using|Totally Using) ' > "$1" || true   # keep output even on failure
 }
 
 check_one() {   # $1 = golden file, $2 = label, rest = args

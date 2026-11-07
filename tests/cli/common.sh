@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # common.sh -- shared helpers for the LS-align black-box CLI tests.
 #
-# IMPORTANT: the LS-align binary ALWAYS exits with status 1 (LSalign.cpp:453),
-# even on success.  So we never test $? ; we parse stdout instead.
+# Exit code: 0 on success, 1 on failure (B28).  Most numeric assertions still
+# parse stdout because the table is the contract; exit codes are covered
+# explicitly by test_cli_args.sh.
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="${LSALIGN_BIN:-${TESTS_DIR}/build/LSalign_under_test}"
@@ -12,7 +13,7 @@ FIX="${TESTS_DIR}/fixtures"
 CLI_PASS=0
 CLI_FAIL=0
 
-# Run the binary (ignore its always-1 exit) and emit stdout only.
+# Run the binary and emit stdout only (stderr diagnostics are dropped).
 run_ls() {
     "${BIN}" "$@" 2>/dev/null
     return 0
@@ -29,15 +30,18 @@ count_rows() {
 }
 
 # assert_alive LABEL args...  -- assert the binary ran to completion.
-# The binary always exits 1 on success (LSalign.cpp:453), so success is judged by
-# "not a crash/load failure" (exit 139 = SIGSEGV, 127 = load/double-free abort)
-# plus at least one data row on stdout.
+# Success means exit 0 (B28) with at least one data row on stdout.  A signal
+# death (139 = SIGSEGV) or a loader/abort failure (127) is reported by name.
 assert_alive() {
     local label="$1"; shift
     local out rc n
     out="$("${BIN}" "$@" 2>/dev/null)"; rc=$?
     if [ "${rc}" -eq 139 ] || [ "${rc}" -eq 127 ]; then
         bad "${label}: crashed (exit ${rc})"
+        return 1
+    fi
+    if [ "${rc}" -ne 0 ]; then
+        bad "${label}: exit ${rc} (expected 0)"
         return 1
     fi
     n="$(printf '%s\n' "${out}" | awk 'NR>2 && $3 ~ /^[0-9]+\.[0-9]+$/ {n++} END{print n+0}')"
@@ -50,13 +54,15 @@ assert_alive() {
 }
 
 # run_ls_capture OUT_VAR ERR_VAR args...  -- run the binary capturing stdout and
-# stderr separately (the trailing newline of each stream is stripped).  Always
-# returns 0, like run_ls.
+# stderr separately (the trailing newline of each stream is stripped).  The exit
+# status is left in RC for callers that care; the function itself returns 0.
+RC=0
 run_ls_capture() {
     local out_var="$1"; local err_var="$2"; shift 2
     local out_f err_f
     out_f="$(mktemp)"; err_f="$(mktemp)"
     "${BIN}" "$@" >"${out_f}" 2>"${err_f}"
+    RC=$?
     eval "${out_var}=\$(cat \"${out_f}\")"
     eval "${err_var}=\$(cat \"${err_f}\")"
     rm -f "${out_f}" "${err_f}"

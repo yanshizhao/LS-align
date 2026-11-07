@@ -6,8 +6,9 @@
 # (collect2 exits 116). Always link with -static-libstdc++ -static-libgcc, or
 # use -static. The README's own example uses -static for the same reason.
 #
-# Note: the LS-align binary always returns exit code 1 (LSalign.cpp:453) even on
-# success, so CLI scripts must NOT rely on the exit status -- they parse stdout.
+# Note: the LS-align binary exits 0 on success and 1 on failure (B28).
+# Numeric CLI assertions still parse stdout (the table is the contract); exit
+# codes and invalid-argument handling are covered by cli/test_cli_args.sh.
 
 CXX      := g++
 SRC      := ../src
