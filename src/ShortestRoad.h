@@ -61,6 +61,21 @@ public:
 		return longestShortestRoad8Floyd;
 	}
 
+	// Shortest hop count from i to j; -1 when unreachable.
+	// The stored path includes the start atom, so a direct edge is len 2.
+	int getHopCount(int i, int j) const {
+		if (!m_isValid || i < 0 || j < 0
+			|| i >= *p_node_num || j >= *p_node_num){
+			return -1;
+		}
+		if (i == j) return 0;
+		int len = 0;
+		while (len < *p_node_num && allRoad8Floyd[i][j][len] >= 0){
+			len++;
+		}
+		return (len <= 1) ? -1 : len - 1;
+	}
+
 	~ShortestRoad(){
 		if (NULL != adjmap){
 			release2DArr(*p_node_num, adjmap);
@@ -169,8 +184,13 @@ private:
 	 ****************************************************************************/
 	void recursionSearchPath8FloydAlgorithm(int** spot, int i, int j, int* path, int* roadLen) {
 		if (i == j)return;
-		if (spot[i][j] == -1)
-			path[roadLen[0]++] = j;
+		if (spot[i][j] == -1){
+			// spot == -1 covers both "direct edge" and "no path".  Only a
+			// real edge (adjmap entry > 0) appends j; an unreachable pair
+			// keeps the path at just the start atom instead of faking [i, j].
+			if (adjmap[i][j] > 0.0)
+				path[roadLen[0]++] = j;
+		}
 		else {
 			recursionSearchPath8FloydAlgorithm(spot, i, spot[i][j], path, roadLen);
 			recursionSearchPath8FloydAlgorithm(spot, spot[i][j], j, path, roadLen);
