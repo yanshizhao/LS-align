@@ -77,15 +77,18 @@ private:
 	vector< vector<BondType> > atomBondTypes;			// record the bondtypes of each atom
 	
 	vector<string> atomtypes;			// the atom type is Upper word
+	vector<string> atomNames;			// original atom names, same index as points
 	vector<BondInfo> bondInfoes;		// the bond	information in the ligand, without Jun definition bond type
 	BondType** btMtx;					// record the i - j bond type
 	
 	double** bondDisMtx;				// not-connect is setted as -1
 public:
-	Ligand(string ligname, vector<Point3D> points, vector<string> atomtypes, vector<BondInfo> bondInfoes){
+	Ligand(string ligname, vector<Point3D> points, vector<string> atomtypes, vector<BondInfo> bondInfoes,
+		vector<string> atomNames = vector<string>()){
 		this->ligname = ligname;
 		this->points = points;
 		this->atomtypes = atomtypes;
+		this->atomNames = atomNames;
 		this->bondInfoes = bondInfoes;
 		
 		btMtx = NULL;
@@ -105,6 +108,7 @@ public:
 		
 		this->ligname = lig.ligname;
 		this->atomtypes = lig.atomtypes;
+		this->atomNames = lig.atomNames;
 		this->bondInfoes = lig.bondInfoes;
 		
 		if (NULL != lig.btMtx){
@@ -144,6 +148,7 @@ public:
 		}
 		ligname    = lig.ligname;
 		atomtypes  = lig.atomtypes;
+		atomNames  = lig.atomNames;
 		bondInfoes = lig.bondInfoes;
 
 		int n = (int)lig.points.size();
@@ -248,6 +253,13 @@ public:
 	
 	string getAtomType(int ind){
 		return atomtypes[ind];
+	}
+	
+	string getAtomName(int ind){
+		if (ind < 0 || ind >= (int)atomNames.size()){
+			return "";
+		}
+		return atomNames[ind];
 	}
 	
 	vector<BondInfo> getBondInfoes(){
@@ -669,6 +681,7 @@ private:
 		string ligname;
 		vector<Point3D> points;
 		vector<string> atomtypes;
+		vector<string> atomNames;
 		vector<BondInfo> bondInfoes;
 		
 		int l = 0;
@@ -717,6 +730,7 @@ private:
 			Point3D pos(x, y, z);
 			points.push_back(pos);
 			atomtypes.push_back(atomtype);
+			atomNames.push_back(atomName);
 			
 			l++;
 		}
@@ -790,19 +804,22 @@ private:
 		if (!isLoad_H_atom){			
 			vector<string>::iterator at_it;
 			vector<Point3D>::iterator pt_it;
+			vector<string>::iterator an_it;
 			int *oldMapNewInd = new int[atomtypes.size()];
 			int oldInd = 0, NewInd = 0;
 			
-			for (at_it = atomtypes.begin(), pt_it = points.begin(); at_it != atomtypes.end();){
+			for (at_it = atomtypes.begin(), pt_it = points.begin(), an_it = atomNames.begin(); at_it != atomtypes.end();){
 				if (0 == at_it->compare(0, at_it->size(), "H")
 					|| 0 == at_it->compare(0, at_it->size(), "h")){
 					at_it = atomtypes.erase(at_it);
 					pt_it = points.erase(pt_it);
+					an_it = atomNames.erase(an_it);
 					
 					oldMapNewInd[oldInd++] = -1;
 				}else{
 					at_it++;
 					pt_it++;
+					an_it++;
 					
 					oldMapNewInd[oldInd++] = NewInd++;
 				}
@@ -834,7 +851,7 @@ private:
 			cerr << "LSalign: warning: ligand '" << ligname << "' in " << filePath
 				<< " has no atoms; its scores will be 0" << endl;
 		}
-		Ligand ans(ligname, points, atomtypes, bondInfoes);
+		Ligand ans(ligname, points, atomtypes, bondInfoes, atomNames);
 		return ans;
 	}
 
