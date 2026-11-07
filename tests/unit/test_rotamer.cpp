@@ -321,6 +321,110 @@ TEST(b33_partition_refuses_incomplete_cover) {
     CHECK(rd.generateRotamers().empty());
 }
 
+/* ================= R4 (aligned-bond filter) ================= */
+
+/* A ligand built from atoms [first..last] of another ligand, with the bonds
+ * whose two ends both fall in that window (indices rebased to 0).  Used to make
+ * a partial template so that only part of the query is rigidly aligned. */
+static Ligand r4SubLigand(Ligand& src, int first, int last) {
+    std::vector<Point3D> pts;
+    std::vector<std::string> types;
+    for (int i = first; i <= last; ++i) {
+        pts.push_back(src.getIthPoints(i));
+        types.push_back(src.getAtomType(i));
+    }
+    std::vector<BondInfo> all = src.getBondInfoes();
+    std::vector<BondInfo> bonds;
+    for (std::size_t i = 0; i < all.size(); ++i) {
+        if (all[i].aInd >= first && all[i].aInd <= last
+            && all[i].bInd >= first && all[i].bInd <= last) {
+            BondInfo b = all[i];
+            b.aInd -= first;
+            b.bInd -= first;
+            bonds.push_back(b);
+        }
+    }
+    return Ligand("R4SUB", pts, types, bonds);
+}
+
+/* R4: the rigid-aligned-bond filter used to assign isAIndAligned in the B-atom
+ * branch, so isBIndAligned stayed false and no bond was ever removed.  With
+ * chain13 aligned onto its first 9 atoms, bonds 0-1 .. 7-8 have both ends
+ * aligned at distance 0 and must be dropped; only bonds with an unaligned end
+ * survive.  Measured: bug build -> singleBonds 12, 26 rotamers which rotate
+ * the aligned core; fixed build -> singleBonds 4, 2 rotamers that move only
+ * atoms 9-12, leaving every aligned atom (0..8) in place. */
+TEST(r4_aligned_bonds_are_removed) {
+    Ligands ligs("fixtures/chain_c13.mol2", false);
+    std::vector<Ligand> all = ligs.getLigands();
+    Ligand q = all[0];
+    CHECK(q.size() == 13);
+    Ligand t = r4SubLigand(q, 0, 8);
+
+    RigidLSalign rigid(q, t, 2.0);
+    std::vector<AlignedPair> pairs = rigid.getFinalAlignedPair();
+    CHECK(pairs.size() == 9);                    /* atoms 0..8, distance 0 */
+
+    LigRotamerDetector rd(q);
+    CHECK(rd.findAllSingleBond().size() == 12);
+
+    std::vector<Ligand> rot = rd.generateRotamers(&rigid);
+    CHECK(rot.size() == 2);                      /* measured, not estimated */
+    for (std::size_t r = 0; r < rot.size(); ++r) {
+        for (int k = 0; k <= 8; ++k) {
+            /* the aligned core must not be rotated any more */
+            CHECK(q.getIthPoints(k).dist(rot[r].getIthPoints(k)) < 1e-9);
+        }
+    }
+}
+
+/* R4: a bond with only one end aligned stays in the rotation set.  chain_c13
+ * is a straight chain, so any atom prefix with the bonds that fit is another
+ * chain.  Query = 10-atom chain, template = its first 5 atoms: atoms 0..4 are aligned at distance 0, so bonds 0-1..3-4 are dropped
+ * but bond 4-5 (only atom 4 aligned) must survive.  Measured: fixed build keeps
+ * 5 bonds (4-5..8-9) and yields 8 rotamers; some of those rotate the side of
+ * bond 4-5, i.e. atoms 0..3 move.  No other kept bond (5-6..8-9) can move an
+ * atom below 5, so any motion there proves the half-aligned bond was kept.
+ * The buggy build keeps all 9 bonds and yields 26 rotamers. */
+TEST(r4_half_aligned_bonds_are_kept) {
+    Ligands ligs("fixtures/chain_c13.mol2", false);
+    std::vector<Ligand> all = ligs.getLigands();
+    Ligand src = all[0];
+    CHECK(src.size() == 13);
+
+    std::vector<Point3D> pts;
+    std::vector<std::string> types;
+    for (int i = 0; i < 10; ++i) {
+        pts.push_back(src.getIthPoints(i));
+        types.push_back(src.getAtomType(i));
+    }
+    std::vector<BondInfo> srcBonds = src.getBondInfoes();
+    std::vector<BondInfo> bonds;
+    for (std::size_t i = 0; i < srcBonds.size(); ++i)
+        if (srcBonds[i].aInd < 10 && srcBonds[i].bInd < 10)
+            bonds.push_back(srcBonds[i]);
+    Ligand q("R4C10", pts, types, bonds);
+    CHECK(q.size() == 10);
+    Ligand t = r4SubLigand(q, 0, 4);
+
+    RigidLSalign rigid(q, t, 2.0);
+    CHECK(rigid.getFinalAlignedPair().size() == 5);
+    LigRotamerDetector rd(q);
+    CHECK(rd.findAllSingleBond().size() == 9);
+
+    std::vector<Ligand> rot = rd.generateRotamers(&rigid);
+    CHECK(rot.size() == 8);                      /* measured, not estimated */
+
+    bool lowAtomMoved = false;
+    for (std::size_t r = 0; r < rot.size(); ++r) {
+        for (int k = 0; k <= 3; ++k) {
+            if (q.getIthPoints(k).dist(rot[r].getIthPoints(k)) > 1e-9)
+                lowAtomMoved = true;
+        }
+    }
+    CHECK(lowAtomMoved);                         /* bond 4-5 survived */
+}
+
 /* ================= X1 (deterministic decimation above 5000) ================= */
 
 static bool x1SameRotamerSets(const std::vector<Ligand>& a, const std::vector<Ligand>& b) {

@@ -166,7 +166,10 @@ TEST(f4_empty_ali_returns_empty_aligninfo) {
  * behaves like -rf 0 on such input). */
 TEST(f4_select_rotamers_empty_init_returns_empty) {
     Ligands q("fixtures/octane.mol2", false);
-    Ligands t("fixtures/self.mol2", false);
+    /* R4 fixed the aligned-bond filter: octane vs self removes all 7 bonds, so
+     * its flexible set is now empty (measured 2 -> 0).  unrelatedA aligns only
+     * 3 atoms, leaving 2 rotamers, which is what this case needs. */
+    Ligands t("fixtures/unrelatedA.mol2", false);
     /* R1 changed the 4th seed, so unrelatedA x unrelatedB at d0=0.1 now keeps
      * one final pair.  tiny x unrelatedB still has none (both pre- and
      * post-R1), which is what this case needs. */

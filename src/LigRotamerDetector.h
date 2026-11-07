@@ -258,7 +258,7 @@ public:
 				}
 
 				if (!isBIndAligned && ai.rowInd == bInd){
-					isAIndAligned = true;
+					isBIndAligned = true;
 					aveDis += rigidAlignDiss[jun];
 				}
 
