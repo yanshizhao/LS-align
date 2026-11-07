@@ -206,3 +206,112 @@ TEST(f4_degenerate_alignment_frees_all) {
     }
     CHECK(d.delta() == 0);
 }
+
+/* F2: parseFinalAliInfo used to add a NaN pair score to `sco` *before* the
+ * "is this pair real?" test, and NaN compares false, so a garbage pair was
+ * also recorded as an aligned pair.  The geometry check must come first:
+ * such a pair contributes nothing, is not recorded and is not counted. */
+TEST(f2_parse_final_ali_finite) {
+    Ligands ligs("fixtures/self.mol2", false);
+    RigidLSalign ali(ligs[0], ligs[0], 2.0);
+
+    /* self vs self: all six atoms are aligned at distance 0 */
+    int row = 0, col = 0;
+    std::vector<AlignedPair> before = ali.getFinalAlignedPair();
+    int goodPairs = (int)before.size();
+    CHECK(goodPairs > 0);
+
+    for (row = 0; row < 3; ++row) {
+        for (col = 0; col < 3; ++col) {
+            ali.rotMtx[row][col] = std::numeric_limits<double>::quiet_NaN();
+        }
+    }
+    ali.finalAlignedPair.clear();
+    ali.finalAlignedPairDist.clear();
+    ali.parseFinalAliInfo();
+
+    /* every rotated query point is NaN, so every distance is NaN */
+    CHECK(ali.p_AliInfo->sco == ali.p_AliInfo->sco);
+    CHECK(ali.p_AliInfo->sco >= 0.0);
+    CHECK(ali.finalAlignedPair.empty());
+    CHECK(ali.finalAlignedPairDist.empty());
+    CHECK(ali.alisco == ali.alisco);
+    CHECK(ali.alisco == 0.0);
+}
+
+/* F2: LSscoreFunc must keep the full query x templ matrix even when a pair's
+ * distance is undefined; the distance term degrades to 0, never NaN. */
+TEST(f2_lsscore_mtx_no_nan) {
+    Ligands ligs("fixtures/self.mol2", false);
+    Ligands tiny("fixtures/tiny.mol2", false);
+    RigidLSalign ali(tiny[0], ligs[0], 2.0);
+
+    double nanVal = std::numeric_limits<double>::quiet_NaN();
+    std::vector<Point3D> queryPts;
+    queryPts.push_back(Point3D(nanVal, nanVal, nanVal));
+    for (int i = 1; i < (int)tiny[0].size(); ++i) {
+        queryPts.push_back(tiny[0].getIthPoints(i));
+    }
+
+    AlignInfo* p = ali.LSscoreFunc(queryPts, ligs[0].getPoints());
+    CHECK(p != NULL);
+    CHECK(p->sco == p->sco);
+    CHECK(p->sco >= 0.0);
+    /* dimensions are dictated by the ligand sizes, not by the guard */
+    CHECK(p->len == (int)tiny[0].size());
+    /* the distance term degrades to 0, so every row still has usable
+     * (mass / bond) scores and the full matrix stays assignable */
+    CHECK((int)p->getAliPairs().size() == (int)tiny[0].size());
+    delete p;
+
+    /* all-NaN query: the result is still a well-formed, finite-scored info */
+    std::vector<Point3D> allNan;
+    for (int i = 0; i < (int)tiny[0].size(); ++i) {
+        allNan.push_back(Point3D(nanVal, nanVal, nanVal));
+    }
+    AlignInfo* q = ali.LSscoreFunc(allNan, ligs[0].getPoints());
+    CHECK(q != NULL);
+    CHECK(q->sco == q->sco);
+    CHECK(q->sco >= 0.0);
+    CHECK(q->len == (int)tiny[0].size());
+    CHECK((int)q->getAliPairs().size() == (int)tiny[0].size());
+    delete q;
+}
+
+/* F2: the three-point fingerprint helpers must stay finite when the distance
+ * matrix contains an undefined entry, and must still find the real extremes
+ * among the good entries. */
+TEST(f2_three_special_points_no_nan) {
+    Ligands q("fixtures/octane.mol2", false);
+    Ligands t("fixtures/self.mol2", false);
+    FlexibleLSalign f(q[0], t[0], 2.0, false, false, false);
+
+    double nanVal = std::numeric_limits<double>::quiet_NaN();
+    std::vector<Point3D> pts;
+    pts.push_back(Point3D(0.0, 0.0, 0.0));
+    pts.push_back(Point3D(nanVal, nanVal, nanVal));
+    pts.push_back(Point3D(3.0, 0.0, 0.0));
+    pts.push_back(Point3D(0.0, 4.0, 0.0));
+    pts.push_back(Point3D(0.0, 0.0, 12.0));
+    pts.push_back(Point3D(0.0, 1.0, 0.0));
+
+    double** mtx = f.calculateDisPow2Mtx(pts);
+    double* three = f.calculateThreeSpecicalDistPow2((int)pts.size(), mtx);
+    CHECK(three[0] == three[0]);
+    CHECK(three[1] == three[1]);
+    CHECK(three[2] == three[2]);
+    CHECK(three[0] >= 0.0);
+    CHECK(three[1] >= 0.0);
+    CHECK(three[2] >= 0.0);
+    /* farthest finite pair is (0,4,0)-(0,0,12): 16 + 144 = 160 */
+    CHECK_CLOSE(three[0], 160.0, 1e-9);
+
+    double sco = f.scoreWithThreeSpecialPts((int)pts.size(), mtx,
+        three[0], three[1], three[2]);
+    CHECK(sco == sco);
+    CHECK(sco >= 0.0);
+    CHECK(sco < 1e18);
+
+    release2DArr((int)pts.size(), mtx);
+    delete[] three;
+}

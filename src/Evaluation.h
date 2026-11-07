@@ -13,7 +13,8 @@ double RMSD(vector<Point3D> aPts, vector<Point3D> bPts){
 	if (aPts.size() == 0 || bPts.size() == 0) return -1.0;
 	double ans = 0.0;
 	for (int i = 0; i < aPts.size(); i++){
-		ans += aPts[i].distPow2(bPts[i]);
+		double v = aPts[i].distPow2(bPts[i]);
+		if (v >= 0.0) ans += v;
 	}
 	ans = sqrt(ans/aPts.size());
 	
@@ -29,7 +30,8 @@ double RMSD_ub(vector<Point3D> aPts, vector<Point3D> bPts){
 	if (aPts.size() == 0 || bPts.size() == 0) return -1.0;
 	double ans = 0.0;
 	for (int i = 0; i < aPts.size(); i++){
-		ans += aPts[i].distPow2(bPts[i]);
+		double v = aPts[i].distPow2(bPts[i]);
+		if (v >= 0.0) ans += v;
 	}
 	ans = sqrt(ans/aPts.size());
 	
@@ -59,8 +61,9 @@ double RMSD_lb(vector<Point3D> aPts, vector<Point3D> bPts){
 	for (i = 0; i < aPts.size(); i++){
 		double minDisPow2 = 99999999999999999.0;
 		for (j = 0; j < bPts.size(); j++){
-			if (minDisPow2 > p_disPow2Mtx[i][j]){
-				minDisPow2 = p_disPow2Mtx[i][j];
+			double v = p_disPow2Mtx[i][j];
+			if (v >= 0.0 && minDisPow2 > v){
+				minDisPow2 = v;
 			}
 		}
 		ansA_B += minDisPow2;
@@ -71,8 +74,9 @@ double RMSD_lb(vector<Point3D> aPts, vector<Point3D> bPts){
 	for (j = 0; j < bPts.size(); j++){
 		double minDisPow2 = 99999999999999999.0;
 		for (i = 0; i < aPts.size(); i++){
-			if (minDisPow2 > p_disPow2Mtx[i][j]){
-				minDisPow2 = p_disPow2Mtx[i][j];
+			double v = p_disPow2Mtx[i][j];
+			if (v >= 0.0 && minDisPow2 > v){
+				minDisPow2 = v;
 			}
 		}
 		ansB_A += minDisPow2;
@@ -108,8 +112,9 @@ double RMSD_lb_min(vector<Point3D> aPts, vector<Point3D> bPts){
 	for (i = 0; i < aPts.size(); i++){
 		double minDisPow2 = 99999999999999999.0;
 		for (j = 0; j < bPts.size(); j++){
-			if (minDisPow2 > p_disPow2Mtx[i][j]){
-				minDisPow2 = p_disPow2Mtx[i][j];
+			double v = p_disPow2Mtx[i][j];
+			if (v >= 0.0 && minDisPow2 > v){
+				minDisPow2 = v;
 			}
 		}
 		ansA_B += minDisPow2;
@@ -120,8 +125,9 @@ double RMSD_lb_min(vector<Point3D> aPts, vector<Point3D> bPts){
 	for (j = 0; j < bPts.size(); j++){
 		double minDisPow2 = 99999999999999999.0;
 		for (i = 0; i < aPts.size(); i++){
-			if (minDisPow2 > p_disPow2Mtx[i][j]){
-				minDisPow2 = p_disPow2Mtx[i][j];
+			double v = p_disPow2Mtx[i][j];
+			if (v >= 0.0 && minDisPow2 > v){
+				minDisPow2 = v;
 			}
 		}
 		ansB_A += minDisPow2;

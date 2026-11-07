@@ -579,6 +579,10 @@ private:
 		return str.substr(begin, end - begin + 1);
 	}
 
+	static bool isFiniteCoord(double v){
+		return v == v && v <= 1e308 && v >= -1e308;    // rejects NaN and +-Inf
+	}
+
 	static bool isPureNumber(const string& str){
 		string trimmed = trimWhitespace(str);
 		if (trimmed.empty()){
@@ -729,6 +733,13 @@ private:
 				exit(EXIT_FAILURE);
 			}
 
+			if (!isFiniteCoord(x) || !isFiniteCoord(y) || !isFiniteCoord(z)){
+				cerr << "LSalign: " << filePath << ":" << blockStartLine + l
+					<< ": non-finite coordinate (ligand '" << ligname << "')" << "\n     "
+					<< oneLigMol2Infos[l] << endl;
+				exit(EXIT_FAILURE);
+			}
+
 			Point3D pos(x, y, z);
 			points.push_back(pos);
 			atomtypes.push_back(atomtype);
@@ -796,6 +807,13 @@ private:
 			bondInfo.bInd = atom2Ind;
 			bondInfo.bt = bondtype;
 			bondInfo.bondDisPow2 = points[atom1Ind].distPow2(points[atom2Ind]);
+			if (!(bondInfo.bondDisPow2 >= 0.0 && bondInfo.bondDisPow2 <= 1e308)){
+				cerr << "LSalign: " << filePath << ":" << blockStartLine + ll
+					<< ": non-finite bond length (ligand '" << ligname
+					<< "', atoms " << (atom1Ind+1) << "-" << (atom2Ind+1) << ")" << "\n     "
+					<< oneLigMol2Infos[ll] << endl;
+				exit(EXIT_FAILURE);
+			}
 			bondInfo.bondDis = sqrt(bondInfo.bondDisPow2);
 			
 			bondInfoes.push_back(bondInfo);

@@ -184,6 +184,11 @@ private :
 		bool* isSelected = new bool[queryRotamers.size()];
 		for (i = 0; i < queryRotamers.size(); i++)
 			isSelected[i] = false;
+		// NaN would make the sort order depend on comparison quirks: treat it as worst.
+		for (i = 0; i < (int)rmsd_lb_arr.size(); i++){
+			if (rmsd_lb_arr[i] != rmsd_lb_arr[i])
+				rmsd_lb_arr[i] = 1e17;
+		}
 		int* index1 = ascentInsertSortIndex(rmsd_lb_arr, sn/2);
 		for (i = 0; i < sn/2; i++){
 			ans.push_back(queryRotamers[index1[i]]);
@@ -270,6 +275,11 @@ private :
 				p_rawRLSali = NULL;
 			}
 				
+			// NaN would make the sort order depend on comparison quirks: treat it as worst.
+			for (i = 0; i < (int)rawRigidLSscoreVec.size(); i++){
+				if (rawRigidLSscoreVec[i] != rawRigidLSscoreVec[i])
+					rawRigidLSscoreVec[i] = -1e30;
+			}
 			int* index3 = descentInsertSortIndex(rawRigidLSscoreVec, 2);
 			for (i = 0; i < 2; i++){
 				ans.push_back(queryRotamers[index3[i]]);
@@ -315,8 +325,9 @@ private :
 		double disPow2_AB = 0.0;
 		for (i = 0; i < lig_size; i++){
 			for (j = i+1; j < lig_size; j++){
-				if (p_disPow2Mtx[i][j] > disPow2_AB){
-					disPow2_AB = p_disPow2Mtx[i][j];
+				double v = p_disPow2Mtx[i][j];
+				if (v >= 0.0 && v > disPow2_AB){
+					disPow2_AB = v;
 					AInd = i;
 					BInd = j;
 				}
@@ -331,11 +342,15 @@ private :
 		double disPow2_BC = 0.0;
 		for (i = 0; i < lig_size; i++){
 			if (i != AInd && i != BInd){
-				double disACB = p_disPow2Mtx[i][AInd] + p_disPow2Mtx[i][BInd];
+				double dA = p_disPow2Mtx[i][AInd];
+				double dB = p_disPow2Mtx[i][BInd];
+				if (!(dA >= 0.0) || !(dB >= 0.0))
+					continue;
+				double disACB = dA + dB;
 				if (disACB > disPow2_ACB){
 					disPow2_ACB = disACB;
-					disPow2_AC = p_disPow2Mtx[i][AInd];
-					disPow2_BC = p_disPow2Mtx[i][BInd];
+					disPow2_AC = dA;
+					disPow2_BC = dB;
 				}
 			}
 		}
@@ -369,13 +384,13 @@ private :
 			double ACDiff = 9999999999999999999.0;
 			for (j = i+1; j < lig_size; j++){
 				double _ABDiff = abs(disPow2Mtx[i][j] - ref_disPow2_far);
-				if (_ABDiff < ABDiff){
+				if (_ABDiff >= 0.0 && _ABDiff < ABDiff){
 					ABDiff = _ABDiff;
 					Bind = j;
 				}
 
 				double _ACDiff = abs(disPow2Mtx[i][j] - ref_disPow2_dis1);
-				if (_ACDiff < ACDiff){
+				if (_ACDiff >= 0.0 && _ACDiff < ACDiff){
 					ACDiff = _ACDiff;
 					Cind = j;
 				}

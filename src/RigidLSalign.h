@@ -504,6 +504,11 @@ private:
 			
 			Point3D rotQueryPt = rotateAndTrans(query.getIthPoints(ithPair.rowInd), transVec, rotMtx);
 			double disPow2 = rotQueryPt.distPow2(templ.getIthPoints(ithPair.colInd));
+
+			// unknown geometry (NaN/negative): no score, no pair, not counted
+			if (!(disPow2 >= 0.0))
+				continue;
+
 			double ithsco = OU_SCO_WEIGHT_FOR_FINAL_SCO * (1.0 / (1.0 + disPow2/d0_pow2))
 				+ MASS_SCO_WEIGHT_FOR_FINAL_SCO * massDiffScoMtx[ithPair.rowInd][ithPair.colInd]
 				+ JUNBOND_SCO_WEIGHT_FOR_FINAL_SCO * junBondInfoScoMtx_for_final_sco[ithPair.rowInd][ithPair.colInd];
@@ -801,7 +806,7 @@ private:
 				vector<Point3D> queryPoses_T = rotateAndTrans(query.getPoints(), t, u);
 				AlignInfo* pAliInfo = LSscoreFunc(queryPoses_T, templ.getPoints());	// the return new a new memory
 				
-				if (pAliInfo->sco > maxScore){
+				if (pAliInfo->sco >= 0.0 && pAliInfo->sco > maxScore){
 					maxScore = pAliInfo->sco;
 					
 					if (isNeedRotMtxAndTransVec){
@@ -840,7 +845,8 @@ private:
 			vector<double> qRow;
 			for (int j = 0; j < templ_pts.size(); j++){
 				double disPow2 = query_rotted_pts[i].distPow2(templ_pts[j]);
-				double disSco_ij = 1.0/(1.0 + disPow2 / d0_pow2);
+				// unknown geometry: give the distance term 0 (worst), keep the matrix full
+				double disSco_ij = (disPow2 >= 0.0) ? (1.0/(1.0 + disPow2 / d0_pow2)) : 0.0;
 			    
 				/*
 				  OU_SCO_WEIGHT       几何重叠的权重

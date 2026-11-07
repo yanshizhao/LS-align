@@ -1,6 +1,7 @@
 #include "mini_test.h"
 #include "EnhancedGS.h"
 #include <vector>
+#include <limits>
 
 /* EnhancedGS is the "enhanced greedy search" assignment solver.
  * It maximizes the sum of selected entries with each row/col used at most once.
@@ -46,4 +47,40 @@ TEST(enhancedgs_more_rows_than_cols) {
     AlignInfo* p = egs.getPAliInfo();
     CHECK(p->getAliPairs().size() == 2);
     CHECK_CLOSE(p->sco, 1.1, 1e-9);
+}
+
+/* F2: an undefined (NaN) cell must never be selected.  The greedy pass keeps
+ * its "no score worse than 0" invariant, so the finite cells still win. */
+TEST(f2_enhancedgs_ignores_nan_cell) {
+    double nanVal = std::numeric_limits<double>::quiet_NaN();
+    std::vector<std::vector<double> > m;
+    std::vector<double> r0; r0.push_back(nanVal); r0.push_back(0.4);
+    std::vector<double> r1; r1.push_back(0.3); r1.push_back(nanVal);
+    m.push_back(r0); m.push_back(r1);
+
+    EnhancedGS egs(m);
+    AlignInfo* p = egs.getPAliInfo();
+    CHECK(p->sco == p->sco);
+    CHECK(p->sco >= 0.0);
+    /* only the two finite cells can be picked: (0,1)=0.4 and (1,0)=0.3 */
+    CHECK_CLOSE(p->sco, 0.7, 1e-9);
+    std::vector<AlignedPair> pairs = p->getAliPairs();
+    CHECK(pairs.size() == 2);
+    for (int i = 0; i < (int)pairs.size(); ++i) {
+        CHECK(p->getIthAliVec(pairs[i].rowInd) != -1);
+    }
+}
+
+/* F2: an all-NaN matrix yields an empty, finite-scored alignment. */
+TEST(f2_enhancedgs_all_nan_is_empty) {
+    double nanVal = std::numeric_limits<double>::quiet_NaN();
+    std::vector<std::vector<double> > m;
+    std::vector<double> r0(2, nanVal);
+    std::vector<double> r1(2, nanVal);
+    m.push_back(r0); m.push_back(r1);
+
+    EnhancedGS egs(m);
+    AlignInfo* p = egs.getPAliInfo();
+    CHECK(p->sco == 0.0);
+    CHECK(p->getAliPairs().empty());
 }

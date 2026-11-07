@@ -231,8 +231,9 @@ private :
 					if (-1 != col_ind && -1 != rela_another_row_ind)
 						decVal = scoMtx[rela_another_row_ind][new_col_ind] - scoMtx[rela_another_row_ind][col_ind];
 
-					if (incVal - decVal > maxScoreChange){
-						maxScoreChange = incVal - decVal;
+					double delta = incVal - decVal;
+					if (delta >= 0.0 && delta > maxScoreChange){
+						maxScoreChange = delta;
 						exchange_row_ind = rela_another_row_ind;
 						exchange_col_ind = new_col_ind;
 					}
@@ -340,8 +341,9 @@ private :
 				if (-1 != col_ind && -1 != rela_another_row_ind)
 					decVal = scoMtx[rela_another_row_ind][new_col_ind] - scoMtx[rela_another_row_ind][col_ind];
 
-				if (incVal - decVal > maxScoreChange){
-					maxScoreChange = incVal - decVal;
+				double delta = incVal - decVal;
+				if (delta >= 0.0 && delta > maxScoreChange){
+					maxScoreChange = delta;
 					exchange_row_ind = rela_another_row_ind;
 					exchange_col_ind = new_col_ind;
 				}
@@ -405,7 +407,7 @@ private :
 						}
 					}
 					
-					if (maxValue < value){
+					if (value >= 0.0 && maxValue < value){
 						maxValue = value;
 						corrRowInd = rr;
 						corrColInd = colInd;
