@@ -315,3 +315,70 @@ TEST(f2_three_special_points_no_nan) {
     release2DArr((int)pts.size(), mtx);
     delete[] three;
 }
+
+/* P2: with zero final pairs the "empty vector" sentinel re-ran the whole
+ * settlement on every getter call.  The flag must make settlement happen
+ * once.  Poisoning alisco/sco gives a deterministic observable: a re-parse
+ * overwrites both with its own values. */
+TEST(p2_zero_pair_parses_once) {
+    Ligands a("fixtures/unrelatedA.mol2", false);
+    Ligands b("fixtures/unrelatedB.mol2", false);
+    RigidLSalign ali(a[0], b[0], 0.1);
+    /* unrelatedA/B with d0=0.1: EGS finds pairs, but none within d0 */
+    CHECK(ali.m_isFinalParsed);
+    CHECK(ali.finalAlignedPair.empty());
+    CHECK(ali.finalAlignedPairDist.empty());
+    /* warm up any one-time allocations outside the measured scope */
+    (void)ali.getJaccardRatio();
+
+    ali.alisco = -7.0;
+    ali.p_AliInfo->sco = -7.0;
+
+    /* every sentinel-guarded entry point must trust the flag: a re-parse
+     * would overwrite the poisoned alisco/sco */
+    CHECK(ali.getFinalAlignedPair().empty());
+    CHECK(ali.getFinalAlignedPairDist().empty());
+    CHECK(ali.getJaccardRatio() == 0.0);
+    CHECK(ali.getAlignedRMSD() == 0.0);
+    CHECK(ali.getAliSco() == -7.0);
+    CHECK(ali.toStrVec().size() >= 3);
+    CHECK(ali.formatAliInfo().empty());
+    CHECK(ali.alisco == -7.0);
+    CHECK(ali.p_AliInfo->sco == -7.0);
+
+    LeakDelta d;
+    for (int k = 0; k < 1000; ++k) {
+        (void)ali.getJaccardRatio();
+        (void)ali.getAlignedRMSD();
+        (void)ali.getAliSco();
+    }
+    /* correct behaviour: already settled, so nothing recomputes */
+    CHECK(ali.m_isFinalParsed);
+    CHECK(ali.alisco == -7.0);
+    CHECK(ali.p_AliInfo->sco == -7.0);
+    CHECK(d.delta() == 0);
+}
+
+/* P2: copying a settled object must copy the flag, otherwise the copy
+ * re-parses an already-settled (possibly empty) result on first use. */
+TEST(p2_copy_preserves_flag) {
+    Ligands a("fixtures/unrelatedA.mol2", false);
+    Ligands b("fixtures/unrelatedB.mol2", false);
+    RigidLSalign ali(a[0], b[0], 0.1);
+    CHECK(ali.m_isFinalParsed);
+    CHECK(ali.getFinalAlignedPair().empty());
+
+    ali.alisco = -7.0;
+    ali.p_AliInfo->sco = -7.0;
+
+    RigidLSalign copy(ali);
+    CHECK(copy.m_isFinalParsed);
+    CHECK(copy.finalAlignedPair.empty());
+    CHECK(copy.alisco == -7.0);
+    CHECK(copy.p_AliInfo->sco == -7.0);   /* own AlignInfo, copied score */
+
+    /* the copy trusts its flag too: no re-parse on first getter */
+    (void)copy.getJaccardRatio();
+    CHECK(copy.alisco == -7.0);
+    CHECK(copy.p_AliInfo->sco == -7.0);
+}

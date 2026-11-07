@@ -44,6 +44,7 @@ private:
 
 	vector<AlignedPair> finalAlignedPair;	// the final aligned information
 	vector<double> finalAlignedPairDist;	// record the distance of the final aligned pairs after superposed
+	bool m_isFinalParsed;					// whether parseFinalAliInfo() has settled the two vectors above
 
 	// temp information
 	vector<vector<double> > massDiffScoMtx;
@@ -63,6 +64,7 @@ public:
 		this->p_AliInfo = NULL;
 		
 		alisco = -1;
+		m_isFinalParsed = false;
 
 		initIdentityTransform();
 
@@ -93,6 +95,7 @@ public:
 		}
 
 		alisco = rLSalign.alisco;
+		m_isFinalParsed = rLSalign.m_isFinalParsed;
 
 		for (i = 0; i < rLSalign.massDiffScoMtx.size(); i++){
 			vector<double> tmp_mass_row;
@@ -152,6 +155,7 @@ public:
 
 
 		alisco = -1;
+		m_isFinalParsed = false;
 
 		initIdentityTransform();
 
@@ -168,6 +172,7 @@ public:
 		this->p_AliInfo = NULL;
 
 		alisco = -1;
+		m_isFinalParsed = false;
 
 		initIdentityTransform();
 
@@ -210,7 +215,7 @@ public:
 	}
 
 	vector<string> toStrVec(){
-		if (0 == finalAlignedPair.size()){
+		if (!m_isFinalParsed){
 			parseFinalAliInfo();
 		}
 
@@ -299,7 +304,7 @@ public:
 	}
 
 	vector<string> formatAliInfo(){
-		if (0 == finalAlignedPair.size()){
+		if (!m_isFinalParsed){
 			parseFinalAliInfo();
 		}
 		/* double d0 = sqrt(d0_pow2); */
@@ -422,7 +427,7 @@ public:
 	}
 
 	vector<AlignedPair> getFinalAlignedPair(){
-		if (0 == finalAlignedPair.size()){
+		if (!m_isFinalParsed){
 			parseFinalAliInfo();
 		}	
 		
@@ -430,7 +435,7 @@ public:
 	}
 
 	vector<double> getFinalAlignedPairDist(){
-		if (0 == finalAlignedPairDist.size()){
+		if (!m_isFinalParsed){
 			parseFinalAliInfo();
 		}	
 		
@@ -438,7 +443,7 @@ public:
 	}
 
 	double getJaccardRatio(){
-		if (0 == finalAlignedPairDist.size()){
+		if (!m_isFinalParsed){
 			parseFinalAliInfo();
 		}
 		int denom = (int)templ.size() + (int)query.size() - (int)finalAlignedPairDist.size();
@@ -446,7 +451,7 @@ public:
 	}
 
 	double getAlignedRMSD(){
-		if (0 == finalAlignedPairDist.size()){
+		if (!m_isFinalParsed){
 			parseFinalAliInfo();
 		}
 
@@ -529,6 +534,7 @@ private:
 		}
 		
 		p_AliInfo->sco = sco;
+		m_isFinalParsed = true;
 	}	
 
 	void align(){
