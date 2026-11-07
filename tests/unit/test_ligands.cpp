@@ -1,4 +1,5 @@
 #include "mini_test.h"
+#include "leak_probe.h"
 #include "Ligands.h"
 #include <string>
 
@@ -184,4 +185,63 @@ TEST(pdb_all_thin_overloads_agree_on_names) {
     /* no-arg overload keeps its historical JUN residue */
     CHECK(a[0].substr(17, 3) == "JUN");
     CHECK(b[0].substr(17, 3) == "QUE");
+}
+
+/* ---- F6: a zero-atom ligand must not rebuild its lazy cache every call ---- */
+TEST(f6_empty_ligand_builds_once) {
+    Ligands ligs("fixtures/empty_ligand.mol2", false);
+    std::vector<Ligand> objs;
+    objs.reserve(100);
+    for (int k = 0; k < 100; ++k) objs.push_back(ligs[0]);
+    { std::vector<std::vector<BondType> > warm = objs[0].getAtomBondTypes(); (void)warm; }
+    LeakDelta d;
+    for (int k = 0; k < 100; ++k) {
+        const std::vector<std::vector<BondType> >& abt = objs[k].getAtomBondTypes();
+        CHECK(abt.size() == 0);
+    }
+    CHECK(d.delta() == 0);
+}
+
+/* ---- F6: the getters hand out the stored vectors, not copies ---- */
+TEST(f6_const_ref_no_copy) {
+    Ligands ligs("fixtures/isolated_atom.mol2", false);
+    const Ligand& L = ligs[0];
+    /* read-only getters are const-qualified and return references */
+    CHECK(&L.getPoints() == &L.getPoints());
+    CHECK(&L.getAtomTypes() == &L.getAtomTypes());
+    CHECK(&L.getBondInfoes() == &L.getBondInfoes());
+    /* getAtomBondTypes() builds its cache lazily, so it needs a non-const
+     * object (unchanged by this ticket); the reference it returns is stable */
+    Ligand M = L;
+    const std::vector<std::vector<BondType> >& a = M.getAtomBondTypes();
+    const std::vector<std::vector<BondType> >& b = M.getAtomBondTypes();
+    CHECK(&a == &b);
+    /* Ligands::operator[] returns the stored element, not a fresh copy: two
+     * such addresses compared in one full-expression would differ otherwise. */
+    CHECK(&ligs[0] == &ligs[0]);
+}
+
+/* ---- F6: atomBondTypes.size() == points.size() even with isolated atoms ---- */
+TEST(f6_size_invariant) {
+    const char* fixtures[3] = {"fixtures/isolated_atom.mol2",
+                               "fixtures/empty_ligand.mol2",
+                               "fixtures/self.mol2"};
+    for (int f = 0; f < 3; ++f) {
+        Ligands ligs(fixtures[f], false);
+        Ligand L = ligs[0];
+        const std::vector<std::vector<BondType> >& abt = L.getAtomBondTypes();
+        CHECK((int)abt.size() == L.size());
+        CHECK(abt.size() == L.getPoints().size());
+    }
+
+    /* isolated_atom.mol2: atoms 1-3 form a chain, atom 4 has no bond */
+    {
+        Ligands iso("fixtures/isolated_atom.mol2", false);
+        Ligand L = iso[0];
+        const std::vector<std::vector<BondType> >& abt = L.getAtomBondTypes();
+        CHECK(abt.size() == 4);
+        CHECK(abt[0].size() == 1);
+        CHECK(abt[1].size() == 2);
+        CHECK(abt[3].empty());
+    }
 }

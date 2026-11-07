@@ -233,7 +233,7 @@ public:
 		return bondDisMtx;
 	}
 	
-	vector<Point3D> getPoints(){
+	const vector<Point3D>& getPoints() const{
 		return points;
 	}
 	
@@ -243,11 +243,11 @@ public:
 		this->points = pts;
 	}
 	
-	Point3D getIthPoints(int ind){
+	Point3D getIthPoints(int ind) const{
 		return points[ind];
 	}
 	
-	vector<string> getAtomTypes(){
+	const vector<string>& getAtomTypes() const{
 		return atomtypes;
 	}
 	
@@ -255,22 +255,22 @@ public:
 		return atomtypes[ind];
 	}
 	
-	string getAtomName(int ind){
+	string getAtomName(int ind) const{
 		if (ind < 0 || ind >= (int)atomNames.size()){
 			return "";
 		}
 		return atomNames[ind];
 	}
 	
-	vector<BondInfo> getBondInfoes(){
+	const vector<BondInfo>& getBondInfoes() const{
 		return bondInfoes;
 	}
 	
-	int size(){
+	int size() const{
 		return points.size();
 	}
 	
-	string getLigname(){
+	string getLigname() const{
 		return ligname;
 	}
 	
@@ -279,8 +279,9 @@ public:
 	 * vector<BondType> ithAtomBt = ans[i]; 
 	 * ans.size() == points.size()
 	 *********************************************************/
-	vector< vector<BondType> > getAtomBondTypes(){
-		if (0 == atomBondTypes.size()){
+	const vector< vector<BondType> >& getAtomBondTypes(){
+		if ((int)atomBondTypes.size() != (int)points.size()){
+			atomBondTypes.clear();
 			int i = 0, j = 0;
 			
 			vector< vector<int> > rings;
@@ -310,8 +311,9 @@ public:
 			}// end for_i
 			
 			getBondTypeMtx();
+			atomBondTypes.assign(points.size(), vector<BondType>());
 			for (i = 0; i < size(); i++){
-				vector<BondType> ithAtomBts;
+				vector<BondType>& ithAtomBts = atomBondTypes[i];
 
 				// set mol2 bond type
 				for (j = 0; j < size(); j++){
@@ -338,7 +340,6 @@ public:
 					}
 				}// end for_j
 
-				atomBondTypes.push_back(ithAtomBts);
 			}// end for _i
 				
 		}// end if 
@@ -368,15 +369,15 @@ public:
     /*******************************************************
 	* format this ligand as pdb file content
 	*******************************************************/
-	vector<string> format2PDB(){
+	vector<string> format2PDB() const{
 		return format2PDB("JUN", 1, 88888);
 	}
 	
-	vector<string> format2PDB(string ligtype){
+	vector<string> format2PDB(string ligtype) const{
 		return format2PDB(ligtype, 1, 88888);
 	}
 	
-	vector<string> format2PDB(string ligtype, int atom_start_index, int mol_no){
+	vector<string> format2PDB(string ligtype, int atom_start_index, int mol_no) const{
 		int i = 0;
 		vector<string> ans;
 		char lt[4];
@@ -950,7 +951,7 @@ public:
 		return ligs;
 	}
 	
-	Ligand operator[](int ind){
+	const Ligand& operator[](int ind) const{
 		return ligs[ind];
 	}
 	
