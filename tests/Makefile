@@ -52,7 +52,7 @@ help:
 	@echo "make test        - run the default CI suite (unit + cli; no ASan/dataset)"
 	@echo "make unit        - build & run white-box unit tests"
 	@echo "make cli         - build the binary & run black-box CLI tests"
-	@echo "make asan        - build with ASan/UBSan & run leak/UB checks (xfail)"
+	@echo "make asan        - alias of leakcheck (ASan unavailable on this toolchain)"
 	@echo "make golden      - (re)generate golden snapshots"
 	@echo "make check-golden- diff current output against golden snapshots"
 	@echo "make output-diff   - full output-level regression vs output_diff/baseline"
@@ -75,7 +75,7 @@ unit: $(BUILD)/unit$(EXE)
 
 # Same unit tests, compiled with -D_GLIBCXX_ASSERTIONS: container misuse aborts
 # deterministically instead of silently corrupting memory.  Expected to match
-# `make unit` exactly (31 passed / 5 xfail); any new failure is a real bug.
+# `make unit` exactly; any new failure is a real bug.
 $(BUILD)/unit_assert$(EXE): unit/test_main.cpp mini_test.h leak_probe.h $(SRC_HEADERS) $(TEST_SOURCES)
 	@mkdir -p $(BUILD)
 	$(CXX) $(UNITFLAGS_ASSERT) unit/test_main.cpp -lm -o $@
@@ -106,12 +106,13 @@ cli-assert: $(SRC)/LSalign.cpp
 # --------------------------------------------------------------------------- #
 # Leak check: ASan/UBSan are NOT available on this MinGW toolchain (no libasan
 # runtime; -fsanitize=address fails to link).  The dedicated leak checks live in
-# unit/test_xfail.cpp using the portable leak_probe.h counter, so they already
+# unit/test_xfail.cpp (historical name; its cases are plain TESTs since T-016)
+# using the portable leak_probe.h counter, so they already
 # run as part of `make unit`.  This target exists as an explicit entry point and
 # makes the environment limitation visible.
 # --------------------------------------------------------------------------- #
 leakcheck: unit
-	@echo "== leak checks (via leak_probe.h; see the [XFAIL] leak_* cases above) =="
+	@echo "== leak checks (via leak_probe.h; see the leak_* cases in unit/) =="
 	@echo "   NOTE: ASan/UBSan unavailable on this MinGW toolchain -- see report."
 
 # Kept as an alias so scripted invocations of 'make asan' still work.
