@@ -225,7 +225,7 @@ public:
 		string secondLine(buf);
 		ans.push_back(secondLine);
 		
-		sprintf(buf, "The LS-score in the LS-align is %.3f", p_AliInfo->sco/(templ.size()>query.size()?templ.size():query.size()));
+		sprintf(buf, "The LS-score in the LS-align is %.3f", getLSscore());
 		string thirdLine(buf);
 		ans.push_back(thirdLine);
 

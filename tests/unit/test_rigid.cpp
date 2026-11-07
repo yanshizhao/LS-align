@@ -1,6 +1,8 @@
 #include "mini_test.h"
 #include "Ligands.h"
 #include "RigidLSalign.h"
+#include <string>
+#include <vector>
 
 /* Rigid-LS-align: self-alignment and rigid-transform invariance.
  * For a perfect alignment every pair contributes 0.45 + 0.10 + 0.45 = 1.0,
@@ -49,4 +51,17 @@ TEST(rigid_ace_example_matches_paper_band) {
     CHECK(lsScore > 0.30 && lsScore < 0.95);
     /* it should align a healthy number of atom pairs */
     CHECK(ali.getFinalAlignedPair().size() >= 5);
+}
+
+/* ---- F12: toStrVec() divided by max(Nq,Nt) with no zero guard ---- */
+TEST(f12_tostrvec_no_nan_on_empty_ligands) {
+    Ligands a("fixtures/empty_ligand.mol2", false);
+    Ligands b("fixtures/empty_ligand.mol2", false);
+    RigidLSalign ali(a[0], b[0], 0.1);
+    std::vector<std::string> lines = ali.toStrVec();
+    CHECK(lines.size() >= 3);
+    /* line 2 is the LS-score line; 0/0 used to print "nan" */
+    CHECK(lines[2].find("nan") == std::string::npos);
+    CHECK(lines[2].find("0.000") != std::string::npos);
+    CHECK(lines[2] == "The LS-score in the LS-align is 0.000");
 }
