@@ -515,6 +515,12 @@ private:
 		}
 		
 		Point3D rot_axis = p_lig->getIthPoints(smallPartAtomIndInBond) - p_lig->getIthPoints(bigPartAtomIndInBond);
+		if (rot_axis.dist(Point3D(0.0, 0.0, 0.0)) < 1e-12){
+			cerr << "LSalign: WARNING: zero-length rotation axis (atoms "
+				<< smallPartAtomIndInBond << " and " << bigPartAtomIndInBond
+				<< " coincide); rotation skipped for this angle." << endl;
+			return;
+		}
 		double** rotMtx = generateRotatedCoordinate(rot_axis, angle);			// need release
 		
 		// around the bigPartAtomIndInBond point to rotated the small part

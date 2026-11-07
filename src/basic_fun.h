@@ -325,6 +325,16 @@ double** generateRotatedCoordinate(Point3D axis, double ang){		// the memory nee
 	
 	Point3D Opt(0.0, 0.0, 0.0);
 	double axisLen = axis.dist(Opt);
+
+	// degenerate: zero-length axis would divide by zero; return the identity
+	if (axisLen < 1e-12){
+		double** ident = new2DArr(3, 3);
+		ident[0][0] = 1.0;
+		ident[1][1] = 1.0;
+		ident[2][2] = 1.0;
+		return ident;
+	}
+
 	awx /= axisLen;
 	awy /= axisLen;
 	awz /= axisLen;
