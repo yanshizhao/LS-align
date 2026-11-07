@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 using namespace std;
@@ -45,41 +46,30 @@ public:
 	/***************************************
 	 * @param ind: The ind value must in {0, 1, 2}
 	 * @return ans[0] = x; ans[1] = y; ans[2] = z;
+	 *         NaN when ind is outside {0, 1, 2}
 	 ***************************************/
-	double 	operator[](int ind){
-		double ans;
+	double 	operator[](int ind) const {
 		if (0 == ind)
-			ans = x;
-		else if (1 == ind)
-			ans = y;
-		else if (2 == ind)
-			ans = z;
-		return ans;
+			return x;
+		if (1 == ind)
+			return y;
+		if (2 == ind)
+			return z;
+		return std::numeric_limits<double>::quiet_NaN();
 	}
-	
+
 	double getX(){
 		return x;
 	}
-	
+
 	double getY(){
 		return y;
 	}
-	
+
 	double getZ(){
 		return z;
 	}
-	
-	double get(int ind){
-		double ans;
-		if (0 == ind)
-			ans = x;
-		else if (1 == ind)
-			ans = y;
-		else if (2 == ind)
-			ans = z;
-		return ans;
-	}
-	
+
 	/*************************************************
 	 * calculate the distance between pt and this Point3D
 	 *************************************************/

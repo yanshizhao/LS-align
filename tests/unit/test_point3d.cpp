@@ -27,6 +27,24 @@ TEST(point3d_copy_is_independent) {
     CHECK_CLOSE(b.getX(), a.getX(), 1e-12);
 }
 
+/* F2: an out-of-range index used to return an uninitialised stack value.  It
+ * is now deterministically NaN, and the accessor leaves the object alone. */
+TEST(f2_oob_nan) {
+    Point3D p(1.0, 2.0, 3.0);
+    CHECK(!(p[3] >= 0.0));
+    CHECK(!(p[-1] >= 0.0));
+    CHECK(!(p[100] >= 0.0));
+    CHECK(p[3] != p[3]);
+    /* in-range indices are unchanged */
+    CHECK(p[0] == 1.0);
+    CHECK(p[1] == 2.0);
+    CHECK(p[2] == 3.0);
+
+    const Point3D q(4.0, 5.0, 6.0);
+    CHECK(q[2] == 6.0);
+    CHECK(!(q[3] >= 0.0));
+}
+
 /* F1: the three operators are value-semantic; no heap object is handed out. */
 TEST(f1_value_semantics) {
     Point3D a(1.5, -2.25, 3.0);
