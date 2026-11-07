@@ -64,6 +64,8 @@ public:
 		
 		alisco = -1;
 
+		initIdentityTransform();
+
 		align();
 	}
 
@@ -151,6 +153,8 @@ public:
 
 		alisco = -1;
 
+		initIdentityTransform();
+
 		align();
 	}
 
@@ -164,6 +168,8 @@ public:
 		this->p_AliInfo = NULL;
 
 		alisco = -1;
+
+		initIdentityTransform();
 
 		align();
 	}
@@ -476,6 +482,15 @@ public:
 	}
 
 private:
+	void initIdentityTransform(){
+		for (int h = 0; h < 3; h++){
+			transVec[h] = 0.0;
+			for (int d = 0; d < 3; d++){
+				rotMtx[h][d] = (h == d) ? 1.0 : 0.0;
+			}
+		}
+	}
+
 	void parseFinalAliInfo(){
 		alisco = 0.0;
 		int alinum = 0;
