@@ -2,6 +2,7 @@
 #include "leak_probe.h"
 #include "Ligands.h"
 #include <string>
+#include <vector>
 
 /* Fixtures are parsed exactly as the program parses real mol2 files
  * (fixed columns, atom type stripped to element symbols, H handling). */
@@ -250,4 +251,173 @@ TEST(f6_size_invariant) {
         CHECK(abt[1].size() == 2);
         CHECK(abt[3].empty());
     }
+}
+
+/* ---- F11: setPoints must drop the caches it invalidated ---- */
+TEST(f11_setpoints_invalidates_caches) {
+    Ligands ligs("fixtures/self.mol2", false);
+    Ligand L = ligs[0];
+
+    /* warm both lazy caches (bondDisMtx, btMtx and atomBondTypes) */
+    CHECK(L.getBondDistMtx() != NULL);
+    CHECK((int)L.getAtomBondTypes().size() == L.size());
+    long warmed = liveAllocs();
+
+    /* a rigid shift: same atom count, every bond length is preserved */
+    std::vector<Point3D> shifted;
+    for (int i = 0; i < (int)L.size(); ++i) {
+        Point3D p = L.getIthPoints(i);
+        shifted.push_back(Point3D(p[0] + 10.0, p[1] - 3.0, p[2] + 7.0));
+    }
+    L.setPoints(shifted);
+
+    /* the matrices were released (7 allocations each) and are NULL again,
+     * so the getters rebuild them lazily from the new geometry.  Without
+     * resetCaches() the stale matrices stay allocated and this is red. */
+    long after = liveAllocs();
+    CHECK(after + 5 <= warmed);
+
+    double** reborn = L.getBondDistMtx();
+    CHECK(reborn != NULL);
+    CHECK(reborn[0][0] == -1.0);               /* rebuilt from scratch */
+    CHECK(reborn[0][1] > 0.0);                 /* ring bond 0-1 survived */
+
+    /* atomBondTypes was cleared too and is rebuilt on demand */
+    CHECK((int)L.getAtomBondTypes().size() == L.size());
+}
+
+/* ---- F15: bondDis follows the coordinates on a non-rigid setPoints ---- */
+TEST(f15_recompute_nonrigid) {
+    Ligands ligs("fixtures/self.mol2", false);
+    Ligand L = ligs[0];
+
+    std::vector<double> before;
+    const std::vector<BondInfo>& bi = L.getBondInfoes();
+    CHECK(bi.size() == 6);
+    for (int i = 0; i < (int)bi.size(); ++i) before.push_back(bi[i].bondDis);
+    CHECK(before[0] > 0.0);
+
+    /* scaling doubles every bond length: the one transform that a rigid
+     * check cannot catch.  (Before the fix setPoints left the old bondDis,
+     * so this is red: the values stay at the unscaled lengths.) */
+    std::vector<Point3D> scaled;
+    for (int i = 0; i < (int)L.size(); ++i) {
+        Point3D p = L.getIthPoints(i);
+        scaled.push_back(Point3D(p[0] * 2.0, p[1] * 2.0, p[2] * 2.0));
+    }
+    L.setPoints(scaled);
+
+    const std::vector<BondInfo>& after = L.getBondInfoes();
+    CHECK(after.size() == bi.size());
+    for (int i = 0; i < (int)after.size(); ++i) {
+        CHECK_CLOSE(after[i].bondDis, before[i] * 2.0, 1e-9);
+        CHECK_CLOSE(after[i].bondDisPow2, before[i] * before[i] * 4.0, 1e-9);
+    }
+    /* the distance matrix reads the refreshed bondDis */
+    double** mtx = L.getBondDistMtx();
+    CHECK_CLOSE(mtx[0][1], before[0] * 2.0, 1e-9);
+}
+
+/* ---- F15: a rigid transform leaves every bond length alone ---- */
+TEST(f15_rigid_unchanged) {
+    Ligands ligs("fixtures/self.mol2", false);
+    Ligand L = ligs[0];
+
+    std::vector<double> before;
+    const std::vector<BondInfo>& bi = L.getBondInfoes();
+    for (int i = 0; i < (int)bi.size(); ++i) before.push_back(bi[i].bondDis);
+
+    /* translation, then a rotation of the whole ligand about the origin */
+    std::vector<Point3D> moved;
+    for (int i = 0; i < (int)L.size(); ++i) {
+        Point3D p = L.getIthPoints(i);
+        moved.push_back(Point3D(p[0] + 4.0, p[1] - 9.0, p[2] + 2.5));
+    }
+    L.setPoints(moved);
+    const std::vector<BondInfo>& shifted = L.getBondInfoes();
+    for (int i = 0; i < (int)shifted.size(); ++i) {
+        CHECK_CLOSE(shifted[i].bondDis, before[i], 1e-12);
+    }
+
+    std::vector<Point3D> rotated;
+    for (int i = 0; i < (int)L.size(); ++i) {
+        Point3D p = L.getIthPoints(i);
+        rotated.push_back(Point3D(p[0], p[2], -p[1]));   /* +90 deg about X */
+    }
+    L.setPoints(rotated);
+    const std::vector<BondInfo>& spun = L.getBondInfoes();
+    for (int i = 0; i < (int)spun.size(); ++i) {
+        CHECK_CLOSE(spun[i].bondDis, before[i], 1e-12);
+    }
+}
+
+/* ---- F15: ulp drift from a rebuilt rotation is not written back ---- */
+TEST(f15_ulp_drift_ignored) {
+    /* Flexible mode rebuilds the whole point list after each bond rotation,
+     * so atoms on the rotation axis pick up ~1e-16 rounding.  Writing that
+     * back to bondDis feeds an ulp into EnhancedGS and flips discrete choices
+     * (measured: octane flex RMSD_lb 2.1042 -> 2.1140).  The refresh therefore
+     * ignores sub-1e-9 drift but still tracks a real change. */
+    std::vector<Point3D> pts;
+    pts.push_back(Point3D(0.0, 0.0, 0.0));
+    pts.push_back(Point3D(1.5, 0.0, 0.0));
+    std::vector<std::string> types;
+    types.push_back("C");
+    types.push_back("C");
+    std::vector<BondInfo> bonds;
+    BondInfo b;
+    b.aInd = 0;
+    b.bInd = 1;
+    b.bt = SINGLE;
+    b.bondDisPow2 = 2.25;
+    b.bondDis = 1.5;
+    bonds.push_back(b);
+    Ligand L("DRIFT", pts, types, bonds);
+
+    /* +4 ulp on the second atom: the stored length must stay bit-identical */
+    std::vector<Point3D> nudged;
+    nudged.push_back(Point3D(0.0, 0.0, 0.0));
+    nudged.push_back(Point3D(1.5 + 8.88e-16, 0.0, 0.0));
+    L.setPoints(nudged);
+    CHECK(L.getBondInfoes()[0].bondDis == 1.5);
+
+    /* a 1e-6 change is well above the threshold and must be recorded */
+    std::vector<Point3D> real;
+    real.push_back(Point3D(0.0, 0.0, 0.0));
+    real.push_back(Point3D(1.500001, 0.0, 0.0));
+    L.setPoints(real);
+    CHECK_CLOSE(L.getBondInfoes()[0].bondDis, 1.500001, 1e-12);
+}
+TEST(f15_index_oob_guard) {
+    /* Build a one-bond ligand, then hand setPoints a shorter point list so
+     * the stored bond indexes fall off the end.  The loop must skip the bond
+     * (and warn on stderr) instead of reading points[1] out of range.  Run
+     * this under 'make unit-assert' to make an unguarded read abort loudly. */
+    std::vector<Point3D> twoPts;
+    twoPts.push_back(Point3D(0.0, 0.0, 0.0));
+    twoPts.push_back(Point3D(1.5, 0.0, 0.0));
+    std::vector<std::string> types;
+    types.push_back("C");
+    types.push_back("C");
+    std::vector<std::string> names;
+    names.push_back("C1");
+    names.push_back("C2");
+    std::vector<BondInfo> bonds;
+    BondInfo b;
+    b.aInd = 0;
+    b.bInd = 1;
+    b.bt = SINGLE;
+    b.bondDisPow2 = 2.25;
+    b.bondDis = 1.5;
+    bonds.push_back(b);
+    Ligand L("TWO", twoPts, types, bonds, names);
+
+    std::vector<Point3D> onePt;
+    onePt.push_back(Point3D(5.0, 5.0, 5.0));
+    L.setPoints(onePt);
+
+    CHECK(L.size() == 1);
+    CHECK(L.getBondInfoes().size() == 1);
+    /* the out-of-range bond keeps its previous length; nothing was read */
+    CHECK_CLOSE(L.getBondInfoes()[0].bondDis, 1.5, 0.0);
 }

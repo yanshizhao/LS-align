@@ -238,9 +238,29 @@ public:
 	}
 	
 	void setPoints(vector<Point3D> pts){
+		resetCaches();                       // F11: release caches sized by the old points
 		vector<Point3D>().swap(this->points);
 		
 		this->points = pts;
+		const double bondDisEps = 1e-9;
+		for (int i = 0; i < (int)bondInfoes.size(); i++){   // F15: refresh, ignoring ulp drift
+			int aInd = bondInfoes[i].aInd;
+			int bInd = bondInfoes[i].bInd;
+			if (aInd < 0 || aInd >= (int)points.size()
+				|| bInd < 0 || bInd >= (int)points.size()){
+				cerr << "LSalign: WARNING: setPoints: bond " << i << " refers to atom "
+					<< (aInd + 1) << "-" << (bInd + 1) << ", valid 1-" << (int)points.size()
+					<< "; bond length left unchanged" << endl;
+				continue;
+			}
+			double d2 = points[aInd].distPow2(points[bInd]);
+			double newDis = sqrt(d2);
+			double dDis = newDis - bondInfoes[i].bondDis;
+			if (dDis > bondDisEps || dDis < -bondDisEps){
+				bondInfoes[i].bondDisPow2 = d2;
+				bondInfoes[i].bondDis     = newDis;
+			}
+		}
 	}
 	
 	Point3D getIthPoints(int ind) const{
