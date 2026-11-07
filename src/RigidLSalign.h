@@ -77,7 +77,7 @@ public:
 		this->d0_pow2 = rLSalign.d0_pow2;
 		this->rough_sliding_step = rLSalign.rough_sliding_step;
 		this->detail_sliding_step = rLSalign.detail_sliding_step;
-		this->p_AliInfo = new AlignInfo(*rLSalign.p_AliInfo);
+		this->p_AliInfo = (NULL != rLSalign.p_AliInfo) ? new AlignInfo(*rLSalign.p_AliInfo) : NULL;
 
 		int i = 0, j = 0;
 		for (i = 0; i < 3; i++){
@@ -415,15 +415,21 @@ public:
 	}
 
 	double getLSscore(){
+		if (NULL == p_AliInfo)
+			return 0.0;
 		int denom = templ.size() > query.size() ? templ.size() : query.size();
 		return (denom > 0) ? (p_AliInfo->sco / denom) : 0.0;
 	}
 	
 	double getLSscore8QuerySize(){
+		if (NULL == p_AliInfo)
+			return 0.0;
 		return (query.size() > 0) ? (p_AliInfo->sco / query.size()) : 0.0;
 	}
 
 	double getLSscore8TemplSize(){
+		if (NULL == p_AliInfo)
+			return 0.0;
 		return (templ.size() > 0) ? (p_AliInfo->sco / templ.size()) : 0.0;
 	}
 
@@ -498,6 +504,9 @@ private:
 	}
 
 	void parseFinalAliInfo(){
+		if (NULL == p_AliInfo)
+			return;
+
 		alisco = 0.0;
 		int alinum = 0;
 
