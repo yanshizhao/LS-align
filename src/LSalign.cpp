@@ -530,7 +530,7 @@ int main(int argc, char* args[]){
 		
 
 			RigidLSalign* p_ali = NULL;
-			if (0 == is_Rigid_Flexi_Fragm){	// Flexible LS-align
+			if (0 == is_Rigid_Flexi_Fragm){	// Rigid-LS-align
 				p_ali = new RigidLSalign(queryligs[i], templligs[j], d0);
 			}else{
 				FlexibleLSalign* p_fLSalign = new FlexibleLSalign(queryligs[i], templligs[j], d0, 
