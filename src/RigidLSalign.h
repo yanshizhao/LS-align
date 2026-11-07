@@ -76,6 +76,7 @@ public:
 		this->templ = rLSalign.templ;
 		this->d0_pow2 = rLSalign.d0_pow2;
 		this->rough_sliding_step = rLSalign.rough_sliding_step;
+		this->detail_sliding_step = rLSalign.detail_sliding_step;
 		this->p_AliInfo = new AlignInfo(*rLSalign.p_AliInfo);
 
 		int i = 0, j = 0;
