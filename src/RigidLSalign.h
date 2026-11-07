@@ -302,7 +302,7 @@ public:
 
 		string queryAtomInd;
 		string queryAtomType;
-		string aliTag;	// distance < d0/2.0 using :, d0/2.0 <= distance < d0 using .
+		string aliTag;	// distance < 1.0 A using ':', otherwise '.'
 		string aliDis;
 		string templAtomType;
 		string templAtomInd;
@@ -316,7 +316,7 @@ public:
 
 			char tag[2];
 			tag[0] = '.';
-			if (dis < 1.0) // if (dis < d0/2.0)
+			if (dis < 1.0) // 1.0 A threshold (legacy; NOT d0/2)
 				tag[0] = ':';
 			tag[1] = '\0';
 			
