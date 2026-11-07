@@ -9,6 +9,9 @@ using namespace std;
 
 #define DOUBLE_PI 6.283185307179586	// 2 * 3.141592653589793
 
+#define OVERLAP_RADIUS_RATIO 0.8	// R9: clash when dis < ratio * min(vdW sum, original distance)
+#define UNREACHABLE_HOPS 999	// R9: BFS sentinel for atom pairs with no bond path
+
 #define NRS_ROTATABLE_BOND_NUM 3
 #define NRS_MIN_ROTATABLE_BOND_NUM 3
 #define NRS_LEGACY_UNPARAM_BOND_NUM 5	// legacy value; after R5 only sampler tests use it
@@ -23,6 +26,9 @@ private:
 	double** origLigDisMtx;		
 	bool isWantedSaveTimeUsingRandomSelect;	// true: cap rotamer sets > 5000 by deterministic decimation (X1)
 
+	// R9: bond-graph hop counts (2 = 1-3 pair, UNREACHABLE_HOPS = no bond path)
+	vector<vector<int> > bondHops;
+
 	// const final 
 	vector<double> rotAngles;
 	
@@ -31,6 +37,7 @@ public:
 		int i = 0, j = 0;
 		this->lig = lig;	                    
 		p_sroad = shortestRoadBetweenTwoAtoms();
+		buildBondHops();
 			
 		origLigDisMtx = new double*[lig.size()];
 		for (i = 0; i < lig.size(); i++){
@@ -58,6 +65,7 @@ public:
 		int i = 0, j = 0;
 		this->lig = lig;	                    
 		p_sroad = shortestRoadBetweenTwoAtoms();
+		buildBondHops();
 			
 		origLigDisMtx = new double*[lig.size()];
 		for (i = 0; i < lig.size(); i++){
@@ -94,6 +102,7 @@ public:
 		int i = 0, j = 0;
 		this->lig = lig;	                    
 		p_sroad = shortestRoadBetweenTwoAtoms();
+		buildBondHops();
 			
 		origLigDisMtx = new double*[lig.size()];
 		for (i = 0; i < lig.size(); i++){
@@ -328,6 +337,33 @@ private:
 	}
 
 
+	// R9: BFS hop table over the bond graph, built once per construction
+	void buildBondHops(){
+		int n = lig.size();
+		const vector<BondInfo>& bis = lig.getBondInfoes();
+		bondHops.clear();
+		bondHops.resize(n);
+		for (int i = 0; i < n; i++){
+			bondHops[i].resize(n, UNREACHABLE_HOPS);
+			vector<int>& dist = bondHops[i];
+			vector<int> queue;
+			dist[i] = 0;
+			queue.push_back(i);
+			for (size_t head = 0; head < queue.size(); head++){
+				int u = queue[head];
+				for (size_t b = 0; b < bis.size(); b++){
+					int v = -1;
+					if (bis[b].aInd == u) v = bis[b].bInd;
+					else if (bis[b].bInd == u) v = bis[b].aInd;
+					if (v >= 0 && v < n && dist[v] == UNREACHABLE_HOPS){
+						dist[v] = dist[u] + 1;
+						queue.push_back(v);
+					}
+				}
+			}
+		}
+	}
+
 	bool judgeIsOverlapAtomsInLig(Ligand* p_decoy){
 		AtomVarDerWaalRadius avdwr;
 		BondType** bondTypeMtx = p_decoy->getBondTypeMtx();
@@ -341,14 +377,20 @@ private:
 			for (int j = i+1; j < p_decoy->size(); j++){
 				if (NOTCONNECTED != bondTypeMtx[i][j])
 					continue;
+				// R9: 1-3 pairs keep their distance under rotation, so skip them (999 still checked)
+				if (2 == bondHops[i][j])
+					continue;
 							
 				Point3D jPos = p_decoy->getIthPoints(j);
 				string jAtomtype = p_decoy->getAtomType(j);
 				double jAtomRadii = avdwr[jAtomtype];
 					
+				// orig is load-bearing: contacts already short in the input (H-bonds) must pass
 				double dis = iPos.dist(jPos);
-				if (dis < origLigDisMtx[i][j] 
-					&& dis/((iAtomRadii+jAtomRadii > origLigDisMtx[i][j] ? origLigDisMtx[i][j] : iAtomRadii+jAtomRadii)) < 0.8){		// TODO here is a constant
+				double radiusSum = iAtomRadii + jAtomRadii;
+				double orig = origLigDisMtx[i][j];
+				double ref = (radiusSum > orig) ? orig : radiusSum;
+				if (dis / ref < OVERLAP_RADIUS_RATIO){
 					isOverlap = true;
 					break;
 				}

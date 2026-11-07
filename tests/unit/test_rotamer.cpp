@@ -630,3 +630,146 @@ TEST(x1_deterministic_decimation) {
         CHECK(lastRec == 7998);
     }
 }
+
+/* ================= R9 (overlap criterion) ================= */
+
+/* R9: bondHops is a BFS hop table over the bond graph, built once per
+ * construction.  Values measured on the fixtures (not estimated): octane is a
+ * linear 8-atom chain, isolated_atom is a 3-atom chain plus one lonely atom. */
+TEST(r9_bond_hops) {
+    CHECK(OVERLAP_RADIUS_RATIO == 0.8);
+    CHECK(UNREACHABLE_HOPS == 999);
+
+    Ligands oct("fixtures/octane.mol2", false);
+    Ligand O = oct.getLigands()[0];
+    LigRotamerDetector rdo(O);
+    CHECK(rdo.bondHops[0][1] == 1);
+    CHECK(rdo.bondHops[0][2] == 2);
+    CHECK(rdo.bondHops[0][7] == 7);
+    CHECK(rdo.bondHops[7][0] == 7);      /* symmetric */
+    CHECK(rdo.bondHops[4][4] == 0);      /* self is 0, not the sentinel */
+    CHECK(rdo.bondHops[3][7] == 4);
+
+    Ligands iso("fixtures/isolated_atom.mol2", false);
+    Ligand I = iso.getLigands()[0];
+    LigRotamerDetector rdi(I);
+    CHECK(I.size() == 4);
+    CHECK(rdi.bondHops[0][1] == 1);
+    CHECK(rdi.bondHops[0][2] == 2);
+    CHECK(rdi.bondHops[0][3] == UNREACHABLE_HOPS);  /* atom 3 has no bonds */
+    CHECK(rdi.bondHops[3][0] == UNREACHABLE_HOPS);
+    CHECK(rdi.bondHops[3][3] == 0);
+
+    /* all three constructors build the table */
+    LigRotamerDetector rdo2(O, true);
+    LigRotamerDetector rdo3(O, true, true);
+    CHECK(rdo2.bondHops[0][7] == 7);
+    CHECK(rdo3.bondHops[0][7] == 7);
+
+    /* the decoy in judgeIsOverlapAtomsInLig has the same atom count and index
+     * order (bond rotation only rewrites coordinates), so the table is directly
+     * reusable for it: rotating octane keeps 8 atoms and the same bond graph. */
+    RigidLSalign rigid = emptyRigidAlignment();
+    std::vector<Ligand> rot = rdo.generateRotamers(&rigid);
+    CHECK(!rot.empty());
+    for (std::size_t r = 0; r < rot.size(); ++r)
+        CHECK(rot[r].size() == O.size());
+}
+
+static int r9FindLigand(const std::vector<Ligand>& all, const std::string& name) {
+    for (std::size_t i = 0; i < all.size(); ++i)
+        if (all[i].getLigname() == name) return (int)i;
+    return -1;
+}
+
+/* R9: ZINC03814163 contains an O...O contact that is already short in the
+ * input conformer (0-based atoms 3 and 12: 2.341 A, 5 bond hops, below
+ * 0.8 * 3.10).  The min(radiusSum, orig) term is what tolerates it; without
+ * orig (pure vdW sum) every conformer of this ligand is rejected.  This case
+ * guards against regressing to the "whole molecule killed" failure: measured
+ * 10 surviving conformers out of 24 candidates. */
+TEST(r9_hydrogen_bond_ligand_keeps_rotamers) {
+    Ligands ligs("../example/ace_ligands.mol2", false);
+    std::vector<Ligand> all = ligs.getLigands();
+    int idx = r9FindLigand(all, "ZINC03814163");
+    CHECK(idx >= 0);
+    if (idx < 0) return;
+    Ligand L = all[idx];
+    CHECK(L.size() == 19);               /* hydrogen atoms are dropped */
+
+    LigRotamerDetector rd(L);
+    CHECK(rd.bondHops[3][12] == 5);      /* the natural short contact, 5 hops */
+
+    RigidLSalign rigid = emptyRigidAlignment();
+    std::vector<Ligand> rot = rd.generateRotamers(&rigid);
+    CHECK(rot.size() == 10);             /* measured, not estimated */
+}
+
+/* The predicate exactly as it was before R9, kept here as an oracle. */
+static bool r9OldJudge(LigRotamerDetector& rd, Ligand* p_decoy) {
+    AtomVarDerWaalRadius avdwr;
+    BondType** bm = p_decoy->getBondTypeMtx();
+    for (int i = 0; i < p_decoy->size(); ++i) {
+        Point3D iPos = p_decoy->getIthPoints(i);
+        double ra = avdwr[p_decoy->getAtomType(i)];
+        for (int j = i + 1; j < p_decoy->size(); ++j) {
+            if (NOTCONNECTED != bm[i][j]) continue;
+            Point3D jPos = p_decoy->getIthPoints(j);
+            double rb = avdwr[p_decoy->getAtomType(j)];
+            double dis = iPos.dist(jPos);
+            double orig = rd.origLigDisMtx[i][j];
+            double ref = (ra + rb > orig) ? orig : ra + rb;
+            if (dis < orig && dis / ref < 0.8) return true;
+        }
+    }
+    return false;
+}
+
+/* Walk every usable bond x every non-zero angle of every ligand. The low
+ * optimization level is deliberate: leak_probe.h replaces global new/delete in
+ * this TU, and at -O2 GCC 14 emits a spurious -Warray-bounds on the inlined
+ * vector destructor (a false positive inside the probe, not in this test). */
+static __attribute__((noinline, optimize("O1"))) void r9CompareAll(
+        const std::vector<Ligand>& all, int& compares, int& mismatches,
+        int& oldTrue, int& badSize) {
+    for (std::size_t k = 0; k < all.size(); ++k) {
+        Ligand L = all[k];
+        LigRotamerDetector rd(L);
+        std::vector<BondInfo> singleBonds = rd.findAllSingleBond();
+        std::vector<std::vector<std::vector<int> > > parts =
+            rd.getUsefulBondTwoPartIndsInfo(&singleBonds);
+        std::vector<double> angles = rd.rotAngles;
+        for (std::size_t b = 0; b < parts.size(); ++b) {
+            std::vector<std::vector<int> > twoPartInds = parts[b];
+            for (std::size_t a = 0; a < angles.size(); ++a) {
+                if (angles[a] == 0.0) continue;
+                Ligand decoy(L);
+                rd.rotatedLigandOnePartOfOneBond(&decoy, singleBonds[b],
+                                                 twoPartInds, angles[a]);
+                if (decoy.size() != L.size()) ++badSize;
+                bool oldVerdict = r9OldJudge(rd, &decoy);
+                bool newVerdict = rd.judgeIsOverlapAtomsInLig(&decoy);
+                ++compares;
+                if (oldVerdict) ++oldTrue;
+                if (oldVerdict != newVerdict) ++mismatches;
+            }
+        }
+    }
+}
+
+/* R9: dropping "dis < orig" changed nothing.  Compare the shipped predicate
+ * against the old one on every ad-hoc rotated conformer of all 49 ACE ligands
+ * (each usable bond x each non-zero angle: 824 conformers, measured).  Both
+ * verdicts occur, so this is not a vacuous comparison. */
+TEST(r9_dropped_condition_is_equivalent) {
+    Ligands ligs("../example/ace_ligands.mol2", false);
+    std::vector<Ligand> all = ligs.getLigands();
+    CHECK(all.size() == 49);
+
+    int compares = 0, mismatches = 0, oldTrue = 0, badSize = 0;
+    r9CompareAll(all, compares, mismatches, oldTrue, badSize);
+    CHECK(badSize == 0);
+    CHECK(compares == 824);              /* measured, not estimated */
+    CHECK(mismatches == 0);
+    CHECK(oldTrue > 0 && oldTrue < compares);
+}
