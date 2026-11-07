@@ -54,7 +54,7 @@ private:
 	vector<vector<double> > junBondInfoScoMtx;
 	vector<vector<double> > junBondInfoScoMtx_for_final_sco;
 public: 
-	RigidLSalign(Ligand query, Ligand templ){
+	RigidLSalign(const Ligand& query, const Ligand& templ){
 		this->query = query;
 		this->templ = templ;
 		
@@ -143,7 +143,7 @@ public:
 		}
 	}
 
-	RigidLSalign(Ligand query, Ligand templ, double d0, 
+	RigidLSalign(const Ligand& query, const Ligand& templ, double d0, 
 			int rough_sliding_step, int detail_sliding_step){
 		this->query = query;
 		this->templ = templ;
@@ -162,7 +162,7 @@ public:
 		align();
 	}
 
-	RigidLSalign(Ligand query, Ligand templ, double d0){
+	RigidLSalign(const Ligand& query, const Ligand& templ, double d0){
 		this->query = query;
 		this->templ = templ;
 		this->d0_pow2 = d0*d0;

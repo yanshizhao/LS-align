@@ -19,7 +19,7 @@ private :
 	RigidLSalign* p_initalRLSalign; 
 	vector<Ligand> queryRotamers;
 public : 
-	FlexibleLSalign(Ligand query, Ligand templ){
+	FlexibleLSalign(const Ligand& query, const Ligand& templ){
 		this->query = query;
 		this->templ = templ;
 		this->d0 = 2.0;
@@ -32,7 +32,7 @@ public :
 		isNeedMoreCorrectAlign = false;
 	}
 
-	FlexibleLSalign(Ligand query, Ligand templ, double d0){
+	FlexibleLSalign(const Ligand& query, const Ligand& templ, double d0){
 		this->query = query;
 		this->templ = templ;
 		this->d0 = d0;
@@ -43,7 +43,7 @@ public :
 		isNeedMoreCorrectAlign = false;
 	}
 
-	FlexibleLSalign(Ligand query, Ligand templ, double d0, 
+	FlexibleLSalign(const Ligand& query, const Ligand& templ, double d0, 
 		bool isNeedMoreSmallAngleStep, bool isWantedSaveTimeUsingRandomSelect,
 		bool isNeedMoreCorrectAlign){
 		this->query = query;
@@ -69,7 +69,7 @@ public :
 		this->isNeedMoreCorrectAlign = isNeedMoreCorrectAlign;
 	}
 
-	FlexibleLSalign(Ligand query, Ligand templ, RigidLSalign initalRLSalign){
+	FlexibleLSalign(const Ligand& query, const Ligand& templ, RigidLSalign initalRLSalign){
 		this->query = query;
 		this->templ = templ;
 

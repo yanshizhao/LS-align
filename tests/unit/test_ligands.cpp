@@ -16,7 +16,7 @@ TEST(ligands_loads_single_fixture) {
 TEST(ligands_atom_type_reduced_to_element) {
     Ligands ligs("fixtures/weird_cols.mol2", false);
     CHECK(ligs.size() == 1);
-    /* getLigands() returns by value -- hold the copy, do not bind a reference */
+    /* getLigands() returns const& -- the copy below is a deliberate snapshot */
     std::vector<Ligand> all = ligs.getLigands();
     Ligand& L = all[0];
     /* C.ar -> C, N.am -> N, O.co2 -> O, Cl -> CL, Br -> BR (uppercased) */

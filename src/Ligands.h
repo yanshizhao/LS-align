@@ -947,7 +947,7 @@ public:
 		vector<Ligand>().swap(ligs);
 	}	
 	
-	vector<Ligand> getLigands(){
+	const vector<Ligand>& getLigands() const{
 		return ligs;
 	}
 	
