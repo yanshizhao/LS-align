@@ -117,6 +117,120 @@ void print_help(char* arg){
 	exit(EXIT_SUCCESS);
 }
 
+// ---------------------------------------------------------------------------//
+// ResultTable: single definition of every result column.  Header and data rows
+// are produced here so a column change cannot drift apart.  The header is
+// printed lazily on the first row (or by finish() when there is no row) so data
+// already computed stays visible if a run dies halfway.
+// ---------------------------------------------------------------------------//
+class ResultTable{
+public:
+	struct Col{
+		const char* h1;		// header, first line
+		const char* h2;		// header, second line ("" = blank field)
+		int width;		// field width shared by headers and data
+		const char* dfmt;	// data conversion; its width must equal 'width'
+	};
+	static const Col kCols[10];
+
+	// Right-align a ligand name in 18 characters (the original inline loops).
+	static void formatName18(const string& name, char out[19]);
+
+	ResultTable() : m_headerPrinted(false) {}
+
+	void emitRow(const char* q18, const char* t18,
+	             double pcQ, double pcT, double pvalQ, double pvalT,
+	             double jaccard, double rmsd, int nq, int nt, bool isLoad_H);
+
+	void finish(clock_t start, clock_t middle, clock_t stop, bool isLoad_H);
+
+private:
+	void printHeader(bool isLoad_H);
+	bool m_headerPrinted;
+};
+
+const ResultTable::Col ResultTable::kCols[10] = {
+	{"QEURY_NAME",   "", 18, "%18s"},
+	{"TEMPL_NAME",   "", 18, "%18s"},
+	{"PC-score8Q",   "", 10, "%10.4f"},
+	{"PC-score8T",   "", 10, "%10.4f"},
+	{"Pval_PC8Q",    "", 10, "%10.6f"},
+	{"Pval_PC8T",    "", 10, "%10.6f"},
+	{"JaccardR",     "", 10, "%10.4f"},
+	{"RMSD_lb",      "", 10, "%10.4f"},
+	{"  QUERY_SIZE ", "", 14, "%14d"},
+	{"  TEMPL_SIZE ", "", 14, "%14d"}
+};
+
+void ResultTable::formatName18(const string& name, char out[19]){
+	int i;
+	for (i = 0; i < 18; i++){
+		if (i < (int)name.size())
+			out[17-i] = name[(int)name.size()-1-i];
+		else
+			out[17-i] = ' ';
+	}
+	out[18] = '\0';
+}
+
+void ResultTable::printHeader(bool isLoad_H){
+	char row[1000];
+	char fmt[256];
+	int len = 0;
+	int i;
+
+	cout << "" << endl;
+	for (i = 0; i < 10; i++){
+		if (i > 0)
+			fmt[len++] = ' ';
+		len += sprintf(fmt + len, "%%%ds", kCols[i].width);
+	}
+	fmt[len] = '\0';
+	sprintf(row, fmt,
+	        kCols[0].h1, kCols[1].h1, kCols[2].h1, kCols[3].h1, kCols[4].h1,
+	        kCols[5].h1, kCols[6].h1, kCols[7].h1, kCols[8].h1, kCols[9].h1);
+	cout << row << endl;
+
+	const char* h2Last = isLoad_H ? "(With \"H\")" : "(Without \"H\")";
+	sprintf(row, fmt,
+	        kCols[0].h2, kCols[1].h2, kCols[2].h2, kCols[3].h2, kCols[4].h2,
+	        kCols[5].h2, kCols[6].h2, kCols[7].h2, h2Last, h2Last);
+	cout << row << endl;
+}
+
+void ResultTable::emitRow(const char* q18, const char* t18,
+                          double pcQ, double pcT, double pvalQ, double pvalT,
+                          double jaccard, double rmsd, int nq, int nt, bool isLoad_H){
+	if (!m_headerPrinted){
+		printHeader(isLoad_H);
+		m_headerPrinted = true;
+	}
+
+	char row[1000];
+	char fmt[256];
+	int len = 0;
+	int i;
+	for (i = 0; i < 10; i++){
+		if (i > 0)
+			fmt[len++] = ' ';
+		len += sprintf(fmt + len, "%s", kCols[i].dfmt);
+	}
+	fmt[len] = '\0';
+	sprintf(row, fmt, q18, t18, pcQ, pcT, pvalQ, pvalT, jaccard, rmsd, nq, nt);
+	cout << row << endl;
+}
+
+void ResultTable::finish(clock_t start, clock_t middle, clock_t stop, bool isLoad_H){
+	if (!m_headerPrinted){
+		printHeader(isLoad_H);
+		m_headerPrinted = true;
+	}
+	cout << endl;
+	cout << "Using " << (1.0*(middle-start)/CLOCKS_PER_SEC) << "-s to load mol2 files." << endl;
+	cout << "Using " << (1.0*(stop-middle)/CLOCKS_PER_SEC) << "-s to do LS-align. " << endl;
+	cout << "Totally Using " << (1.0*(stop-start)/CLOCKS_PER_SEC) << "-s." << endl << endl;
+}
+
 int main(int argc, char* args[]){
 	strcpy(version, "J201704171741");
 	clock_t start, middle, finish;
@@ -277,23 +391,7 @@ int main(int argc, char* args[]){
 	// ----------------             Run LS-Align Algorithm    ------------------//
 	// --------------------------------------------------------------------------//
 	// Using LS-align to superpose Querys and Templs
-	char buf[1000];
-	cout << "" << endl;
-	if (isLoad_H){
-		sprintf(buf, "%18s %18s %10s %10s %10s %10s %10s %10s %14s %14s", 
-			"QEURY_NAME", "TEMPL_NAME", "PC-score8Q", "PC-score8T", "Pval_PC8Q", "Pval_PC8T", "JaccardR", "RMSD_lb", "  QUERY_SIZE ", "  TEMPL_SIZE ");
-		cout << buf << endl;
-		sprintf(buf, "%18s %18s %10s %10s %10s %10s %10s %10s %14s %14s",
-			"",         "",         "",       "",  "",       "",      "",    "", "(With \"H\")",   "(With \"H\")");
-		cout << buf << endl;
-	}else{
-		sprintf(buf, "%18s %18s %10s %10s %10s %10s %10s %10s %14s %14s", 
-			"QEURY_NAME", "TEMPL_NAME", "PC-score8Q", "PC-score8T", "Pval_PC8Q", "Pval_PC8T", "JaccardR", "RMSD_lb", "  QUERY_SIZE ", "  TEMPL_SIZE ");
-		cout << buf << endl;
-		sprintf(buf, "%18s %18s %10s %10s %10s %10s %10s %10s %14s %14s",          
-			"",         "",         "",    "",       "",   "",         "",  "",  "(Without \"H\")", "(Without \"H\")");
-		cout << buf << endl;
-	}
+	ResultTable table;
 
 	for (i = 0; i < queryligs.size(); i++){
 		if (isOnlyRunQthLigSetted && i != OnlyRunQthLig){
@@ -305,29 +403,10 @@ int main(int argc, char* args[]){
 				continue;
 			}
 
-			// format ith query ligname name to fix length 18
 			char ithQnameChArr[19];
-			string ithQname = queryligs[i].getLigname();
-			for (int d = 0; d < 18; d++){
-				if (d < ithQname.size()){
-					ithQnameChArr[17-d] = ithQname[(int)ithQname.size()-1-d];
-				}else{
-					ithQnameChArr[17-d] = ' ';
-				}
-			}
-			ithQnameChArr[18] = '\0';
-			
-			// format jth templ ligname name to fix length 18
 			char jthTnameChArr[19];
-			string jthTname = templligs[j].getLigname();
-			for (int h = 0; h < 18; h++){
-				if (h < jthTname.size()){
-					jthTnameChArr[17-h] = jthTname[(int)jthTname.size()-1-h];
-				}else{
-					jthTnameChArr[17-h] = ' ';
-				}
-			}
-			jthTnameChArr[18] = '\0';
+			ResultTable::formatName18(queryligs[i].getLigname(), ithQnameChArr);
+			ResultTable::formatName18(templligs[j].getLigname(), jthTnameChArr);
 			
 			if (isDefult_d0){
 				//----------------------------------------------------------------------------//
@@ -389,9 +468,8 @@ int main(int argc, char* args[]){
 				double RMSD_lb_out = (RMSD_lb_val < 0.0) ? std::numeric_limits<double>::quiet_NaN() : RMSD_lb_val;
 //				double RMSD_lb_mim = p_ali->getRMSD_lb_min();
 				
-				sprintf(buf, "%18s %18s %10.4f %10.4f %10.6f %10.6f %10.4f %10.4f %14d %14d", ithQnameChArr, jthTnameChArr, 
-					LSscore8QuerySize, LSscore8TemplSize, Pval_8Q, Pval_8T, JaccardR, RMSD_lb_out, queryligs[i].size(), templligs[j].size());
-				cout << buf << endl;
+				table.emitRow(ithQnameChArr, jthTnameChArr,
+					LSscore8QuerySize, LSscore8TemplSize, Pval_8Q, Pval_8T, JaccardR, RMSD_lb_out, queryligs[i].size(), templligs[j].size(), isLoad_H);
 				
 				// save the superposition between the Qth-query ligand with the Tth-templ ligand
 				if (isSaveSupPath 
@@ -447,10 +525,7 @@ int main(int argc, char* args[]){
 	}// end for (i = 0; i < queryligs.size(); i++){
 
 	finish = clock();
-	cout << endl;
-	cout << "Using " << (1.0*(middle-start)/CLOCKS_PER_SEC) << "-s to load mol2 files." << endl;
-	cout << "Using " << (1.0*(finish-middle)/CLOCKS_PER_SEC) << "-s to do LS-align. " << endl;
-	cout << "Totally Using " << (1.0*(finish-start)/CLOCKS_PER_SEC) << "-s." << endl << endl;
+	table.finish(start, middle, finish, isLoad_H);
 
 	return 1;
 }
