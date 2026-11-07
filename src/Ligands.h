@@ -8,6 +8,7 @@
 #include <vector>
 #include <string.h>
 #include <fstream>
+#include <sstream>
 #include "Point3D.h"
 #include "Str.h"
 #include "DijkstraSRoad.h"
@@ -524,58 +525,146 @@ private:
 	}
 };
 
-/******************************************
-* In this class file, we just load mol2 format
-* file, no matter the file contains how many ligands
-******************************************/
-class Ligands{
-private:
-	string mol2path;
-	vector<Ligand> ligs;
-	
-	bool isLoad_H_atom;
-	
+/*************************************************************
+* LigandParser -- file-format parser interface.  Only mol2 is
+* implemented; PDB/SDF parsers are reserved for a later ticket.
+*************************************************************/
+class LigandParser{
 public:
-	Ligands(string mol2path, bool isLoad_H_atom){
-		this->mol2path = mol2path;
-		this->isLoad_H_atom = isLoad_H_atom;
-		
-		load();
-	}
-	
-	~Ligands(){
-		vector<Ligand>().swap(ligs);
-	}	
-	
-	vector<Ligand> getLigands(){
-		return ligs;
-	}
-	
-	Ligand operator[](int ind){
-		return ligs[ind];
-	}
-	
-	int size(){
-		return ligs.size();
-	}
-private:
-	
-/*****************************************
-* we load all the ligands in mol2path
-	*****************************************/
-	void load(){
+	virtual ~LigandParser(){}
+	virtual vector<Ligand> parse(const string& path, bool isLoadH) = 0;
+	virtual const char* name() const = 0;
+};
+
+class Mol2Parser : public LigandParser{
+public:
+	const char* name() const { return "mol2"; }
+
+	vector<Ligand> parse(const string& path, bool isLoadH){
+		filePath = path;
+		isLoad_H_atom = isLoadH;
+
+		vector<Ligand> ans;
 		vector<int> blockStartLines;
 		vector<vector<string> > mol2StrInfos = loadAllLigStrInfoMol2(blockStartLines);
-		
-		for (int i = 0; i < mol2StrInfos.size(); i++){
-			vector<string> mol2Info = mol2StrInfos[i];
-			Ligand lig = parseOneLigMol2(mol2Info, blockStartLines[i]);
-			
-			ligs.push_back(lig);
+		for (int i = 0; i < (int)mol2StrInfos.size(); i++){
+			ans.push_back(parseOneLigMol2(mol2StrInfos[i], blockStartLines[i]));
 		}
-		
-	}	
-	
+		return ans;
+	}
+private:
+	string filePath;
+	bool isLoad_H_atom;
+
+	static string trimWhitespace(const string& str){
+		size_t begin = str.find_first_not_of(" \t");
+		if (string::npos == begin){
+			return "";
+		}
+		size_t end = str.find_last_not_of(" \t");
+		return str.substr(begin, end - begin + 1);
+	}
+
+	static bool isPureNumber(const string& str){
+		string trimmed = trimWhitespace(str);
+		if (trimmed.empty()){
+			return false;
+		}
+		char* endp = NULL;
+		strtod(trimmed.c_str(), &endp);
+		return (NULL != endp) && ('\0' == *endp);
+	}
+
+	static void splitWhitespace(const string& line, vector<string>& tokens){
+		tokens.clear();
+		istringstream iss(line);
+		string token;
+		while (iss >> token){
+			tokens.push_back(token);
+		}
+	}
+
+	static string reduceToElement(const string& atomType){
+		string ans = eraseAll(atomType, '\t');
+		ans = eraseAll(ans, " .1234567890~!@#$%^&*()_+", 25);
+		toUpperString(ans);
+		return ans;
+	}
+
+	static string elementFromAtomName(const string& atomName){
+		string elem;
+		for (int i = 0; i < (int)atomName.size(); i++){
+			char ch = atomName[i];
+			bool isAlpha = (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+			if (isAlpha){
+				elem += ch;
+				if (2 == (int)elem.size()){
+					break;
+				}
+			}else if (!elem.empty()){
+				break;
+			}
+		}
+		toUpperString(elem);
+		return elem;
+	}
+
+	/*************************************************************
+	* Fixed columns first (all shipped data uses that layout); when
+	* the slices are not pure numbers fall back to whitespace tokens.
+	*************************************************************/
+	bool parseAtomRecord(const string& record, string& atomName, string& atomType,
+		double& x, double& y, double& z) const {
+		atomName = "";
+		atomType = "";
+
+		if (record.size() >= 48){
+			string sx = record.substr(17, 9);
+			string sy = record.substr(27, 9);
+			string sz = record.substr(37, 9);
+			if (isPureNumber(sx) && isPureNumber(sy) && isPureNumber(sz)){
+				x = strtod(trimWhitespace(sx).c_str(), NULL);
+				y = strtod(trimWhitespace(sy).c_str(), NULL);
+				z = strtod(trimWhitespace(sz).c_str(), NULL);
+				atomName = trimWhitespace(record.substr(8, 8));
+				atomType = record.substr(47, 2);
+				if (atomType.compare(0, 1, " ") == 0){
+					atomType = record.substr(48, 2);
+				}
+				atomType = reduceToElement(atomType);
+				if (atomType.empty()){
+					atomType = elementFromAtomName(atomName);
+				}
+				return true;
+			}
+		}
+
+		vector<string> tokens;
+		splitWhitespace(record, tokens);
+
+		if (tokens.size() >= 5
+			&& isPureNumber(tokens[2]) && isPureNumber(tokens[3]) && isPureNumber(tokens[4])){
+			atomName = tokens[1];
+			x = strtod(tokens[2].c_str(), NULL);
+			y = strtod(tokens[3].c_str(), NULL);
+			z = strtod(tokens[4].c_str(), NULL);
+			atomType = (tokens.size() >= 6) ? reduceToElement(tokens[5])
+				: elementFromAtomName(atomName);
+			return true;
+		}
+
+		// Four fields (id x y z) carry no name/type; coordinates are usable.
+		if (4 == tokens.size()
+			&& isPureNumber(tokens[1]) && isPureNumber(tokens[2]) && isPureNumber(tokens[3])){
+			x = strtod(tokens[1].c_str(), NULL);
+			y = strtod(tokens[2].c_str(), NULL);
+			z = strtod(tokens[3].c_str(), NULL);
+			return true;
+		}
+
+		return false;
+	}
+
 	Ligand parseOneLigMol2(vector<string> oneLigMol2Infos, int blockStartLine){
 		string ligname;
 		vector<Point3D> points;
@@ -601,45 +690,32 @@ private:
 				break;
 			}
 			
-			// A truly empty line separates sections; any other line here must be
-			// a full fixed-column ATOM record, otherwise parsing silently misfires.
+			// Empty strings separate sections; every other line is a record.
 			if (oneLigMol2Infos[l].empty()){
 				l++;
 				continue;
 			}
-			if (oneLigMol2Infos[l].size() < 48){
-				cerr << "LSalign: " << mol2path << ":" << blockStartLine + l
-					<< ": ATOM record too short for atom type column (ligand '"
-					<< ligname << "')\n     " << oneLigMol2Infos[l] << endl;
+
+			string atomName;
+			string atomtype;
+			double x = 0.0;
+			double y = 0.0;
+			double z = 0.0;
+			if (!parseAtomRecord(oneLigMol2Infos[l], atomName, atomtype, x, y, z)){
+				if (oneLigMol2Infos[l].size() < 48){
+					cerr << "LSalign: " << filePath << ":" << blockStartLine + l
+						<< ": ATOM record too short for atom type column (ligand '"
+						<< ligname << "')\n     " << oneLigMol2Infos[l] << endl;
+				}else{
+					cerr << "LSalign: " << filePath << ":" << blockStartLine + l
+						<< ": cannot parse ATOM record (ligand '"
+						<< ligname << "')\n     " << oneLigMol2Infos[l] << endl;
+				}
 				exit(EXIT_FAILURE);
 			}
 
-			char cstr[50];
-			double x = 0.0;
-			strcpy(cstr, (oneLigMol2Infos[l].substr(17, 9)).c_str());
-			sscanf(cstr, "%lf", &x);	
-			
-			double y = 0.0;
-			strcpy(cstr, (oneLigMol2Infos[l].substr(27, 9)).c_str());
-			sscanf(cstr, "%lf", &y);
-			
-			double z = 0.0;
-			strcpy(cstr, (oneLigMol2Infos[l].substr(37, 9)).c_str());
-			sscanf(cstr, "%lf", &z);
-			
 			Point3D pos(x, y, z);
 			points.push_back(pos);
-			
-
-			//string atomtype = oneLigMol2Infos[l].substr(47, 1);
-			//if (atomtype.compare(0, 1, " ") == 0)
-			//	atomtype = oneLigMol2Infos[l].substr(48, 1);
-			string atomtype = oneLigMol2Infos[l].substr(47, 2);
-			if (atomtype.compare(0, 1, " ") == 0)
-				atomtype = oneLigMol2Infos[l].substr(48, 2);
-			atomtype = eraseAll(atomtype, " .1234567890~!@#$%^&*()_+", 25);
-
-			toUpperString(atomtype);
 			atomtypes.push_back(atomtype);
 			
 			l++;
@@ -673,7 +749,7 @@ private:
 			int nAtoms = (int)points.size();
 			if (atom1Ind < 0 || atom1Ind >= nAtoms
 				|| atom2Ind < 0 || atom2Ind >= nAtoms || atom1Ind == atom2Ind){
-				cerr << "LSalign: " << mol2path << ":" << blockStartLine + ll
+				cerr << "LSalign: " << filePath << ":" << blockStartLine + ll
 					<< ": BOND record refers to atom index out of range (ligand '"
 					<< ligname << "', atoms " << (atom1Ind+1) << "-" << (atom2Ind+1)
 					<< ", valid 1-" << nAtoms << ")\n     " << oneLigMol2Infos[ll] << endl;
@@ -755,13 +831,13 @@ private:
 		}
 		
 		if (points.empty()){
-			cerr << "LSalign: warning: ligand '" << ligname << "' in " << mol2path
+			cerr << "LSalign: warning: ligand '" << ligname << "' in " << filePath
 				<< " has no atoms; its scores will be 0" << endl;
 		}
 		Ligand ans(ligname, points, atomtypes, bondInfoes);
 		return ans;
 	}
-	
+
 	/***********************************************
 	* load all the ligand information in the mol2 file
 	* using the string container
@@ -771,7 +847,7 @@ private:
 		
 		bool isFirst = true;
 		vector<string> mol2Sb;
-		ifstream fin(mol2path.c_str());
+		ifstream fin(filePath.c_str());
 		string line;
 		int lineNo = 1;			// 1-based file line number of `line`
 		int curBlockStartLine = 1;	// file line number of mol2Sb[0]
@@ -806,6 +882,58 @@ private:
 			blockStartLines.push_back(curBlockStartLine);
 		}
 		return ans;
+	}
+};
+
+/******************************************
+* Ligands -- thin loader delegating to a format parser.
+******************************************/
+class Ligands{
+private:
+	string mol2path;
+	vector<Ligand> ligs;
+
+	bool isLoad_H_atom;
+public:
+	Ligands(string mol2path, bool isLoad_H_atom){
+		this->mol2path = mol2path;
+		this->isLoad_H_atom = isLoad_H_atom;
+
+		LigandParser* parser = createLigandParser(mol2path);
+		ligs = parser->parse(mol2path, isLoad_H_atom);
+		delete parser;
+	}
+
+	
+	~Ligands(){
+		vector<Ligand>().swap(ligs);
+	}	
+	
+	vector<Ligand> getLigands(){
+		return ligs;
+	}
+	
+	Ligand operator[](int ind){
+		return ligs[ind];
+	}
+	
+	int size(){
+		return ligs.size();
+	}
+private:
+	static LigandParser* createLigandParser(const string& path){
+		string ext;
+		size_t dot = path.find_last_of('.');
+		if (string::npos != dot){
+			ext = path.substr(dot + 1);
+			toLowerString(ext);
+		}
+		if (ext.empty() || ext == "mol2"){
+			return new Mol2Parser();
+		}
+		cerr << "LSalign: warning: unsupported file extension "
+			<< ext << ", falling back to mol2 parser." << endl;
+		return new Mol2Parser();
 	}
 };
 
