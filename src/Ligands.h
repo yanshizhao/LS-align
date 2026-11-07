@@ -369,44 +369,11 @@ public:
 	* format this ligand as pdb file content
 	*******************************************************/
 	vector<string> format2PDB(){
-		vector<string> ans;
-		for (int i = 0; i < points.size(); i++){
-			//HETATM 7590  PG  ATP B1800       1.475  -6.506  12.945  1.00 36.69           P  
-			char buf[1000];
-			sprintf(buf, "HETATM %4d      JUN 88888    %8.3f%8.3f%8.3f  1.00  0.00         %3s", 
-				(i+1), points[i][0], points[i][1], points[i][2], atomtypes[i].c_str());			
-			string str(buf);
-			ans.push_back(str);
-		}
-		ans.push_back("TER");
-		
-		return ans;
+		return format2PDB("JUN", 1, 88888);
 	}
 	
 	vector<string> format2PDB(string ligtype){
-		int i = 0;
-		vector<string> ans;
-		char lt[4];
-		for (i = 0; i < 3; i++){
-			if (i < ligtype.size()){
-				lt[i] = ligtype[i];
-			}else{
-				lt[i] = ' ';
-			}
-		}
-		lt[3] = '\0';
-		
-		for (i = 0; i < points.size(); i++){
-			//HETATM 7590  PG  ATP B1800       1.475  -6.506  12.945  1.00 36.69           P  
-			char buf[1000];
-			sprintf(buf, "HETATM %4d      %3s 88888    %8.3f%8.3f%8.3f  1.00  0.00         %3s", 
-				(i+1), lt, points[i][0], points[i][1], points[i][2], atomtypes[i].c_str());			
-			string str(buf);
-			ans.push_back(str);
-		}
-		ans.push_back("TER");
-		
-		return ans;
+		return format2PDB(ligtype, 1, 88888);
 	}
 	
 	vector<string> format2PDB(string ligtype, int atom_start_index, int mol_no){
@@ -423,12 +390,22 @@ public:
 		lt[3] = '\0';
 		
 		for (i = 0; i < points.size(); i++){
-			//HETATM 7590  PG  ATP B1800       1.475  -6.506  12.945  1.00 36.69           P  
-			char buf[1000];
-			sprintf(buf, "HETATM %4d      %3s %5d    %8.3f%8.3f%8.3f  1.00  0.00         %3s", 
-				(i+atom_start_index), lt, mol_no, points[i][0], points[i][1], points[i][2], atomtypes[i].c_str());			
-			string str(buf);
-			ans.push_back(str);
+			string elem = (atomtypes[i].size() > 2) ? atomtypes[i].substr(0, 2) : atomtypes[i];
+			string nameField = fitPdbAtomName(getAtomName(i), elem);
+			char buf[256];
+			sprintf(buf, "HETATM %4d %s %3s %5d    %8.3f%8.3f%8.3f  1.00  0.00",
+				(i+atom_start_index), nameField.c_str(), lt, mol_no,
+				points[i][0], points[i][1], points[i][2]);
+			string line(buf);
+			line.resize(76, ' ');
+			if (2 == elem.size()){
+				line += elem;
+			}else if (1 == elem.size()){
+				line += (" " + elem);
+			}else{
+				line += "  ";
+			}
+			ans.push_back(line);
 		}
 		ans.push_back("TER");
 		
@@ -459,6 +436,31 @@ private:
 			bondDisMtx = NULL;
 		}
 		vector< vector<BondType> >().swap(atomBondTypes);
+	}
+
+	/*************************************************************
+	* PDB atom-name field (columns 13-16).  Four-character names,
+	* two-letter elements and names starting with a digit are
+	* left-justified; other names are right-justified.  Oversized
+	* names are truncated to four characters with a warning.
+	*************************************************************/
+	static string fitPdbAtomName(const string& rawName, const string& elem){
+		string name = rawName.empty() ? elem : rawName;
+		if (name.size() > 4){
+			cerr << "LSalign: WARNING: atom name \"" << name
+				<< "\" exceeds 4 chars, truncated for PDB output." << endl;
+			name = name.substr(0, 4);
+		}
+		bool twoLetterElem = (2 == (int)elem.size());
+		bool startsDigit = (!name.empty() && name[0] >= '0' && name[0] <= '9');
+		bool leftJustify = (4 == (int)name.size()) || twoLetterElem || startsDigit;
+		char buf[8];
+		if (leftJustify){
+			sprintf(buf, "%-4s", name.c_str());
+		}else{
+			sprintf(buf, " %-3s", name.c_str());
+		}
+		return string(buf);
 	}
 	BondType toJunDefineBondType(BondType obi, int ring_size){
 		if (SINGLE == obi){
