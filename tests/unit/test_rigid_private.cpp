@@ -461,3 +461,87 @@ TEST(f3_accessors_null_safe) {
     ali.p_AliInfo = saved;
     CHECK(ali.getLSscore() > 0.0);
 }
+
+/* R8: min-max normalisation skipped constant matrices and leaked the raw value
+ * (self x self measured 20.0).  A constant matrix now falls back to the
+ * theoretical coverage match/min(G_A,G_B); two identical molecules cover the
+ * full smaller bond-weight sum, so every search entry must be exactly 1.0. */
+TEST(r8_constant_matrix_uses_coverage) {
+    Ligands s("fixtures/self.mol2", false);
+    Ligands c("fixtures/copy.mol2", false);
+
+    RigidLSalign selfAli(s[0], s[0], 2.0);
+    CHECK((int)selfAli.junBondInfoScoMtx.size() == (int)s[0].size());
+    int i = 0, j = 0;
+    for (i = 0; i < (int)selfAli.junBondInfoScoMtx.size(); ++i) {
+        for (j = 0; j < (int)selfAli.junBondInfoScoMtx[i].size(); ++j) {
+            CHECK_CLOSE(selfAli.junBondInfoScoMtx[i][j], 1.0, 1e-12);
+        }
+    }
+    CHECK_CLOSE(selfAli.junBondInfoScoMtx[0][0], 1.0, 1e-12);
+    CHECK_CLOSE(selfAli.junBondInfoScoMtx[5][5], 1.0, 1e-12);
+    /* the report matrix (Jaccard) is untouched: still 1.0 */
+    CHECK_CLOSE(selfAli.junBondInfoScoMtx_for_final_sco[0][0], 1.0, 1e-12);
+
+    /* rigid copy is the same constant matrix: 20.0 before the fix, 1.0 after */
+    RigidLSalign copyAli(s[0], c[0], 2.0);
+    CHECK_CLOSE(copyAli.junBondInfoScoMtx[0][0], 1.0, 1e-12);
+    CHECK_CLOSE(copyAli.junBondInfoScoMtx[5][5], 1.0, 1e-12);
+}
+
+/* R8: the other constant-matrix case is the opposite one.  An aromatic C6 ring
+ * against an amide N6 ring shares only the "ring" signal, so EGS matches every
+ * bond pair at 0.5: overlap 2.0, G_A = 23.6, G_B = 22.8.  The fallback must
+ * yield 2.0/22.8 = 0.0877 (measured 2.0 before the fix, 0.0877 after), not 1.0. */
+TEST(r8_dissimilar_constant_matrix_uses_coverage) {
+    Ligands ar("fixtures/aromatic_ring.mol2", false);
+    Ligands am("fixtures/amide_ring.mol2", false);
+    RigidLSalign ali(ar[0], am[0], 2.0);
+
+    CHECK((int)ali.junBondInfoScoMtx.size() == 6);
+    int i = 0, j = 0;
+    for (i = 0; i < (int)ali.junBondInfoScoMtx.size(); ++i) {
+        for (j = 0; j < (int)ali.junBondInfoScoMtx[i].size(); ++j) {
+            CHECK_CLOSE(ali.junBondInfoScoMtx[i][j], 2.0 / 22.8, 1e-12);
+        }
+    }
+    CHECK_CLOSE(ali.junBondInfoScoMtx[0][0], 0.0877192982456140, 1e-12);
+    CHECK(ali.junBondInfoScoMtx[0][0] < 0.1);   /* not mistaken for "identical" */
+
+    /* report matrix (Jaccard 2.0/(23.6+22.8-2.0)) is a different quantity and
+     * must not be rewritten by the search-matrix fallback */
+    CHECK_CLOSE(ali.junBondInfoScoMtx_for_final_sco[0][0], 2.0 / 44.4, 1e-12);
+}
+
+/* R8: a matrix with real spread keeps the original min-max path, bit for bit
+ * (octane x octane measured: [0][0]=1/3, [0][1]=0, [1][1]=1). */
+TEST(r8_varying_matrix_still_minmax) {
+    Ligands o("fixtures/octane.mol2", false);
+    RigidLSalign ali(o[0], o[0], 2.0);
+
+    CHECK_CLOSE(ali.junBondInfoScoMtx[0][0], 1.0 / 3.0, 1e-12);
+    CHECK_CLOSE(ali.junBondInfoScoMtx[0][1], 0.0, 1e-12);
+    CHECK_CLOSE(ali.junBondInfoScoMtx[1][1], 1.0, 1e-12);
+
+    int i = 0, j = 0;
+    for (i = 0; i < (int)ali.junBondInfoScoMtx.size(); ++i) {
+        for (j = 0; j < (int)ali.junBondInfoScoMtx[i].size(); ++j) {
+            CHECK(ali.junBondInfoScoMtx[i][j] >= 0.0);
+            CHECK(ali.junBondInfoScoMtx[i][j] <= 1.0);
+        }
+    }
+    /* the report matrix is the unchanged Jaccard matrix (measured [0][0]=1) */
+    CHECK_CLOSE(ali.junBondInfoScoMtx_for_final_sco[0][0], 1.0, 1e-12);
+}
+
+/* R8: min(G_A,G_B) == 0 (neither atom carries a bond) is defined as coverage
+ * 1.0 -- "both have no bonds" is consistent, not zero similarity. */
+TEST(r8_zero_bond_coverage_is_one) {
+    Ligands s("fixtures/single_atom_templ.mol2", false);
+    RigidLSalign ali(s[0], s[0], 2.0);
+
+    CHECK((int)ali.junBondInfoScoMtx.size() == 1);
+    CHECK_CLOSE(ali.junBondInfoScoMtx[0][0], 1.0, 1e-12);
+    /* the report matrix has its own zero guard and stays 0.0 there */
+    CHECK_CLOSE(ali.junBondInfoScoMtx_for_final_sco[0][0], 0.0, 1e-12);
+}

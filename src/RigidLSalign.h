@@ -930,6 +930,7 @@ private:
 		vector< vector<BondType> > templJunAtomBondTypeMtx = templ.getAtomBondTypes();
 
 		vector<vector<double> > _junBondInfoScoMtx;
+		vector<vector<double> > coverMtx;	// theoretical coverage, used when the matrix is constant
 		double maxValEachElement = -9999999.0;
 		double minValEachElement =  9999999.0;
 		for (int i = 0; i < query.size(); i++){
@@ -942,6 +943,7 @@ private:
 
 			vector<double> qRow;
 			vector<double> qRow_for_final_sco;
+			vector<double> qCoverRow;
 			for (int j = 0; j < templ.size(); j++){
 				vector<BondType> jthTAtom = templJunAtomBondTypeMtx[j];				
 
@@ -967,6 +969,12 @@ private:
 				double overlapScore = (p_Ali->sco) / (1.0 + abs(1.0 * ((int)ithQAtom.size() - (int)jthTAtom.size())));
 				qRow.push_back(overlapScore);
 
+				// R8: coverage fallback used when the matrix is constant (max == min)
+				double smallerG = (ithQAtomScore_for_final_sco < jthTAtomScore_for_final_sco)
+				                ? ithQAtomScore_for_final_sco : jthTAtomScore_for_final_sco;
+				double coverVal = (smallerG > 0.0) ? (p_Ali->sco / smallerG) : 1.0;
+				qCoverRow.push_back(coverVal);
+
 				if (maxValEachElement < overlapScore)
 					maxValEachElement = overlapScore;
 				if (minValEachElement > overlapScore)
@@ -983,6 +991,7 @@ private:
 			}// end for j
 
 			_junBondInfoScoMtx.push_back(qRow);
+			coverMtx.push_back(qCoverRow);
 			junBondInfoScoMtx_for_final_sco.push_back(qRow_for_final_sco);
 		}// end for i
 
@@ -992,6 +1001,8 @@ private:
 				double element = _junBondInfoScoMtx[jun][dan];
 				if (maxValEachElement > minValEachElement){
 					 element = (element - minValEachElement) / (maxValEachElement - minValEachElement);
+				}else{
+					element = coverMtx[jun][dan];
 				}
 				qRow.push_back(element);
 			}
