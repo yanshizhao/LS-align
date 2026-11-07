@@ -18,6 +18,9 @@
 #include "test_evaluation.cpp"
 #include "test_enhancedgs.cpp"
 #include "test_ligands.cpp"
+/* Must precede test_rigid/test_rotamer/test_xfail: it pulls RigidLSalign.h,
+ * LigRotamerDetector.h and FlexibleLSalign.h in under "private public". */
+#include "test_rigid_private.cpp"
 #include "test_rigid.cpp"
 #include "test_rotamer.cpp"
 #include "test_oracle.cpp"

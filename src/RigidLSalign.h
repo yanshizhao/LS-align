@@ -739,6 +739,18 @@ private:
 		vector<AlignedPair> oldAli = p_oldAliInfo->getAliPairs();
 		
 		int n_ali = oldAli.size();
+		if (n_ali < 1){
+			// early return skips Kabsch's u=I,t=0 init, so write it here
+			if (isNeedRotMtxAndTransVec){
+				for (int h = 0; h < 3; h++){
+					transVec[h] = 0.0;
+					for (int d = 0; d < 3; d++){
+						rotMtx[h][d] = (h == d) ? 1.0 : 0.0;
+					}
+				}
+			}
+			return new AlignInfo(0.0, NULL, 0);
+		}
 		int L_min = n_ali > 4 ? 4 : n_ali;
 		vector<int> L_init_vec;
 		if (L_min <= 4){
@@ -779,7 +791,12 @@ private:
 				
 				double u[3][3];
 				double* t = new double[3];
-				Kabsch(queryali, templali, t, u);
+				bool kabschOk = Kabsch(queryali, templali, t, u);
+				if (!kabschOk){
+					delete[] t;
+					t = NULL;
+					continue;
+				}
 				
 				vector<Point3D> queryPoses_T = rotateAndTrans(query.getPoints(), t, u);
 				AlignInfo* pAliInfo = LSscoreFunc(queryPoses_T, templ.getPoints());	// the return new a new memory

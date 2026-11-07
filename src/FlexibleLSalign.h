@@ -143,6 +143,10 @@ private :
 		
 		// across the init RigidLSalign information 
 		vector<AlignedPair> initAlign = p_initalRLSalign->getFinalAlignedPair();
+		if (initAlign.empty()){
+			return ans;
+		}
+
 		vector<Point3D> templInitAlignPts;
 		for (i = 0; i < initAlign.size(); i++){
 			int tInd = initAlign[i].colInd;
@@ -161,7 +165,13 @@ private :
 			// using Kabsch's rotation matrix to superpose query to templ
 			double u[3][3];
 			double *t = new double[3];
-			Kabsch(qrotamerInitAlignPts, templInitAlignPts, t, u);
+			bool kabschOk = Kabsch(qrotamerInitAlignPts, templInitAlignPts, t, u);
+			if (!kabschOk){
+				rmsd_lb_arr.push_back(1e17);
+				delete[] t;
+				t = NULL;
+				continue;
+			}
 			
 			vector<Point3D> qRotamerPts_T = rotateAndTrans(queryRotamers[i].getPoints(), t, u);
 			double rmsd_lb = RMSD_lb(qRotamerPts_T, templ.getPoints());
