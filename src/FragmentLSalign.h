@@ -1,5 +1,30 @@
 #ifndef FRAGMENT_LSALIGN_H
 #define FRAGMENT_LSALIGN_H
+/**************************************************************************
+ * WARNING - EXPERIMENTAL, NOT WIRED UP (B14)
+ *
+ * This Fragment mode is unreachable from main(): LSalign.cpp never
+ * instantiates FragmentLSalign, the alignment loop has no "-rf 2" branch,
+ * and the argument parser rejects "-rf 2" outright (B28). The class is
+ * kept only so this header still compiles with the shipping binary.
+ *
+ * Known defects (line numbers below are in this file unless stated):
+ *   1. 314-323 align() tail loop uses out-of-scope j/k and may
+ *      dereference NULL lastTransVec/lastRotMtx (null deref / OOB).
+ *   2. 275-285 lastRotMtx/lastTransVec are overwritten each iteration;
+ *      the release logic is convoluted.
+ *   3. NW_DP.h:99-100 only the outer arrays are freed; the per-row
+ *      val[i]/path[i] arrays leak.
+ *   4. 216-236 partial allocation of rigidLSalignMtx/rigidLSscoreMtx
+ *      is not released when allocation fails midway.
+ *   5. 59 comment says alisco/max(#fragments), but getLSscore()
+ *      divides by atom counts.
+ *
+ * Before enabling Fragment mode: fix all five defects AND give
+ * FragmentLSalign::leftRightPartOnBond() the same two-sided coverage
+ * check that B33 added to LigRotamerDetector::leftRightPartOnBond: the
+ * two sides together must cover every atom of the ligand.
+ **************************************************************************/
 
 #include "Ligands.h"
 #include "ShortestRoad.h"

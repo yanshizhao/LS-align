@@ -1,4 +1,14 @@
 #ifndef NW_DP_H
+
+/*
+ * Only used by FragmentLSalign's fragment-scoring step. The Fragment path
+ * is NOT wired into main() and "-rf 2" is rejected at argument parsing.
+ * Kept compiled so this header does not rot; see FragmentLSalign.h.
+ *
+ * Known defect: runNWDP() frees only the outer val/path arrays; the
+ * per-row arrays (val[i] / path[i]) leak. Fix this before enabling.
+ */
+
 #define NW_DP_H
 
 int* runNWDP(double** scores, int row_num, int col_num, double gap_cost){
