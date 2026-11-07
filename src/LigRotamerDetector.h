@@ -446,11 +446,8 @@ private:
 		int step = singleBonds.size() / N;
 		int mod = singleBonds.size() % N;
 		for (i = 0; i < N; i++){
-			int ind = sortedSIInds[i*step + i];
-			if (i >= mod)
-				ind = sortedSIInds[i*step + mod];
-
-			ans.push_back(ind);
+			int pick = (i >= mod) ? (i*step + mod) : (i*step + i);
+			ans.push_back(sortedSIInds[pick]);
 		}
 
 		delete[] index;
