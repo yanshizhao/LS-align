@@ -19,30 +19,6 @@ private :
 	RigidLSalign* p_initalRLSalign; 
 	vector<Ligand> queryRotamers;
 public : 
-	FlexibleLSalign(const Ligand& query, const Ligand& templ){
-		this->query = query;
-		this->templ = templ;
-		this->d0 = 2.0;
-
-		p_initalRLSalign = new RigidLSalign(query, templ, d0);
-
-		LigRotamerDetector ligRD(query);
-		queryRotamers = ligRD.generateRotamers();
-
-		isNeedMoreCorrectAlign = false;
-	}
-
-	FlexibleLSalign(const Ligand& query, const Ligand& templ, double d0){
-		this->query = query;
-		this->templ = templ;
-		this->d0 = d0;
-		p_initalRLSalign = new RigidLSalign(query, templ, d0);
-		LigRotamerDetector ligRD(query);
-		queryRotamers = ligRD.generateRotamers();
-
-		isNeedMoreCorrectAlign = false;
-	}
-
 	FlexibleLSalign(const Ligand& query, const Ligand& templ, double d0, 
 		bool isNeedMoreSmallAngleStep, bool isWantedSaveTimeUsingRandomSelect,
 		bool isNeedMoreCorrectAlign){
@@ -51,36 +27,9 @@ public :
 		this->d0 = d0;
 		p_initalRLSalign = new RigidLSalign(query, templ, d0);
 		LigRotamerDetector ligRD(query, isNeedMoreSmallAngleStep, isWantedSaveTimeUsingRandomSelect);
-//		queryRotamers = ligRD.generateRotamers();
 		queryRotamers = ligRD.generateRotamers(p_initalRLSalign);
 
-		//////////////////////////////////////////////////////////////
-		// Temp codes
-//		string saveRotamersFolder = "/nfs/amino-home/hujunum/LSalign/0.NewWorkFolder/rotamers/DUDE/";
-//		for (int i = 0; i < queryRotamers.size() && i < 100; i++){
-//			char buf[500];
-//			sprintf(buf, "%s_%d.pdb", query.getLigname().c_str(), i+1);
-//			string savepath = saveRotamersFolder + buf;
-//			queryRotamers[i].save8PDBFormat(savepath);
-//		}
-		//////////////////////////////////////////////////////////////
-
-
 		this->isNeedMoreCorrectAlign = isNeedMoreCorrectAlign;
-	}
-
-	FlexibleLSalign(const Ligand& query, const Ligand& templ, RigidLSalign initalRLSalign){
-		this->query = query;
-		this->templ = templ;
-
-		this->d0 = initalRLSalign.get_d0();
-
-		this->p_initalRLSalign = new RigidLSalign(initalRLSalign);
-		
-		LigRotamerDetector ligRD(query);
-		queryRotamers = ligRD.generateRotamers();
-
-		isNeedMoreCorrectAlign = false;
 	}
 
 	~FlexibleLSalign(){

@@ -12,7 +12,19 @@
 
 /* LigRotamerDetector: conformer generation by rotating rotatable single bonds.
  * Uses a fixed small fixture (octane) so the deterministic path is exercised
- * (rotamer count 5^N < 5000 -> no srand()-driven random subsetting). */
+ * (N=3 and at most 11 angles -> at most 1331 conformers, below the 5000 cap). */
+
+/* R5 removed the no-arg generateRotamers() (N=5, no aligned-bond filter).
+ * The cases below used it only as "generate the conformers of this ligand";
+ * an initial rigid alignment with no aligned pairs reproduces that exactly
+ * (every single bond stays in the rotation set). */
+static RigidLSalign emptyRigidAlignment() {
+    Ligands a("fixtures/tiny.mol2", false);
+    Ligands b("fixtures/unrelatedB.mol2", false);
+    std::vector<Ligand> av = a.getLigands();
+    std::vector<Ligand> bv = b.getLigands();
+    return RigidLSalign(av[0], bv[0], 0.1);
+}
 
 TEST(rotamer_generation_nonempty_and_size_preserved) {
     Ligands ligs("fixtures/octane.mol2", false);
@@ -20,8 +32,11 @@ TEST(rotamer_generation_nonempty_and_size_preserved) {
     Ligand L = all[0];
     CHECK(L.size() == 8);
 
+    RigidLSalign rigid = emptyRigidAlignment();
+    CHECK(rigid.getFinalAlignedPair().empty());
+
     LigRotamerDetector rd(L);
-    std::vector<Ligand> rot = rd.generateRotamers();
+    std::vector<Ligand> rot = rd.generateRotamers(&rigid);
 
     CHECK(rot.size() >= 1);
     for (std::size_t i = 0; i < rot.size(); ++i) {
@@ -79,9 +94,9 @@ TEST(b26_c13_no_abort) {
     for (std::size_t i = 0; i < sel3.size(); ++i)
         CHECK(sel3[i] >= 0 && sel3[i] < s);
 
-    std::vector<int> sel5 = b26SelectC13(5, s);
+    std::vector<int> sel5 = b26SelectC13(NRS_LEGACY_UNPARAM_BOND_NUM, s);
     CHECK(s == 6);
-    CHECK(sel5.size() == 5);
+    CHECK(sel5.size() == NRS_LEGACY_UNPARAM_BOND_NUM);
     for (std::size_t i = 0; i < sel5.size(); ++i)
         CHECK(sel5[i] >= 0 && sel5[i] < s);
 }
@@ -110,7 +125,8 @@ TEST(f8_macro_values) {
 }
 
 /* F8: every index the sampler returns must be a valid index into singleBonds,
- * for both the N=3 (main path) and N=5 (legacy unparameterised path) calls. */
+ * for both the N=3 (main path) and N=5 (legacy unparameterised value; after
+ * R5 only these sampler tests still pass it) calls. */
 TEST(f8_chain_c13_index_range) {
     int s = 0;
     std::vector<int> sel3 = b26SelectC13(3, s);
@@ -248,10 +264,11 @@ TEST(b31_oversized_ligand_skipped_with_diagnostic) {
     Ligand L = b33MakeLigand(301, bonds);
     CHECK(L.size() == 301);
 
+    RigidLSalign rigid = emptyRigidAlignment();
     std::ostringstream captured;
     std::streambuf* oldBuf = std::cerr.rdbuf(captured.rdbuf());
     LigRotamerDetector rd(L);
-    std::vector<Ligand> rot = rd.generateRotamers();
+    std::vector<Ligand> rot = rd.generateRotamers(&rigid);
     std::cerr.rdbuf(oldBuf);
 
     CHECK(rot.empty());
@@ -276,6 +293,7 @@ TEST(b33_long_chain_isolated_no_rotamers_no_error) {
     }
     release2DArr(L.size(), adj);
 
+    RigidLSalign rigid = emptyRigidAlignment();
     std::ostringstream captured;
     std::streambuf* oldBuf = std::cerr.rdbuf(captured.rdbuf());
     LigRotamerDetector rd(L);
@@ -286,7 +304,7 @@ TEST(b33_long_chain_isolated_no_rotamers_no_error) {
         if (!parts.empty()) allPartitionsEmpty = false;
     }
     LigRotamerDetector rd2(L);
-    std::vector<Ligand> rot = rd2.generateRotamers();
+    std::vector<Ligand> rot = rd2.generateRotamers(&rigid);
     std::cerr.rdbuf(oldBuf);
 
     CHECK(singleBonds.size() == 9);
@@ -318,7 +336,8 @@ TEST(b33_partition_refuses_incomplete_cover) {
         std::vector<std::vector<int> > parts = rd.leftRightPartOnBond(singleBonds[k]);
         CHECK(parts.empty());
     }
-    CHECK(rd.generateRotamers().empty());
+    RigidLSalign rigid = emptyRigidAlignment();
+    CHECK(rd.generateRotamers(&rigid).empty());
 }
 
 /* ================= R4 (aligned-bond filter) ================= */
@@ -440,13 +459,15 @@ static bool x1SameRotamerSets(const std::vector<Ligand>& a, const std::vector<Li
     return true;
 }
 
-/* X1: an 11-atom chain plus detail angles (11) with the legacy 5-bond sampler
- * leaves 4 useful bonds (both chain-end bonds have < 4 atoms on one side), so
- * all_rotamer_num = 11^4 = 14641 > 5000 and the decimation branch runs.
- * The old srand(clock())+rand() subset differed between runs; the decimated
- * subset must be reproducible.  Measured on this fixture: the 5000 iterated
- * records yield 791 non-overlapping conformers (the rest are rejected by
- * judgeIsOverlapAtomsInLig). */
+/* X1: the old subsetting used srand(clock())+rand(), so repeated runs differed.
+ * R5 deleted the no-arg path that carried the >5000 case; the with-arg path
+ * keeps the same deterministic decimation, but with N=3 and at most 11 detail
+ * angles it can never exceed 11^3 = 1331 conformers, so the >5000 branch is
+ * UNREACHABLE from any public caller (and from the CLI).  This case therefore
+ * locks (a) reproducibility of the with-arg path and (b) the decimation
+ * arithmetic itself, driving the branch through a white-box extended angle set
+ * (11 + 9 = 20 angles -> 20^3 = 8000 > 5000).  The extension is a test-only
+ * instrument; it does not claim the branch is publicly reachable. */
 TEST(x1_deterministic_decimation) {
     Ligands ligs("fixtures/chain_c13.mol2", false);
     std::vector<Ligand> all = ligs.getLigands();
@@ -466,31 +487,63 @@ TEST(x1_deterministic_decimation) {
     Ligand L("C11CHAIN", pts, types, bonds);
     CHECK(L.size() == 11);
 
-    /* the branch really is reached: 11^4 > 5000 (the sampler clamps N to the
-     * number of useful bonds, which is 4 for this 11-atom chain) */
-    {
-        LigRotamerDetector probe(L, true, true);
-        CHECK(probe.rotAngles.size() == 11);
-        CHECK(probe.isWantedSaveTimeUsingRandomSelect);
-        std::vector<BondInfo> sb = probe.findAllSingleBond();
-        CHECK(sb.size() == 10);
-        std::vector<std::vector<std::vector<int> > > twoParts =
-            probe.getUsefulBondTwoPartIndsInfo(&sb);
-        CHECK(twoParts.size() == 4);        /* both end bonds are too short */
-        CHECK(probe.select_N_RotableSingleBondOnUniformDistribution(
-                  twoParts, sb, NRS_LEGACY_UNPARAM_BOND_NUM).size() == 4);
-    }
+    RigidLSalign rigid = emptyRigidAlignment();
 
+    /* (a) public path: 11 detail angles, N=3 -> 11^3 = 1331, no decimation.
+     * Three runs must be identical.  Measured: 342 non-overlapping conformers
+     * (the rest are rejected by judgeIsOverlapAtomsInLig). */
     LigRotamerDetector rd1(L, true, true);
-    std::vector<Ligand> r1 = rd1.generateRotamers();
+    std::vector<Ligand> r1 = rd1.generateRotamers(&rigid);
     LigRotamerDetector rd2(L, true, true);
-    std::vector<Ligand> r2 = rd2.generateRotamers();
+    std::vector<Ligand> r2 = rd2.generateRotamers(&rigid);
     LigRotamerDetector rd3(L, true, true);
-    std::vector<Ligand> r3 = rd3.generateRotamers();
+    std::vector<Ligand> r3 = rd3.generateRotamers(&rigid);
 
     CHECK(!r1.empty());
     CHECK(x1SameRotamerSets(r1, r2));
     CHECK(x1SameRotamerSets(r1, r3));
-    CHECK(r1.size() == 791);            /* measured, not estimated */
-    CHECK(r1.size() <= 5000);           /* decimation cap holds */
+    CHECK(r1.size() == 342);            /* measured, not estimated */
+    CHECK(r1.size() <= 5000);           /* below the decimation cap */
+
+    /* (b) white-box: 20 angles -> 8000 > 5000, so the decimation branch runs.
+     * Two runs must still be identical.  Measured: 1139 conformers. */
+    LigRotamerDetector d1(L, true, true);
+    for (int e = 0; e < 9; ++e)
+        d1.rotAngles.push_back((25.0 + 20.0 * e) / 360.0 * DOUBLE_PI);
+    CHECK(d1.rotAngles.size() == 20);
+    std::vector<Ligand> q1 = d1.generateRotamers(&rigid);
+
+    LigRotamerDetector d2(L, true, true);
+    for (int e = 0; e < 9; ++e)
+        d2.rotAngles.push_back((25.0 + 20.0 * e) / 360.0 * DOUBLE_PI);
+    std::vector<Ligand> q2 = d2.generateRotamers(&rigid);
+
+    CHECK(!q1.empty());
+    CHECK(x1SameRotamerSets(q1, q2));
+    CHECK(q1.size() == 1139);           /* measured, not estimated */
+    CHECK(q1.size() <= 5000);           /* decimation cap holds */
+
+    /* the decimation arithmetic for 8000 records capped at 5000: iter 1..4999
+     * maps to floor(iter * 8000 / 5000); the map is strictly increasing (the
+     * step is 1.6 records), starts at 1 and ends at 7998. */
+    {
+        const int allRot = 8000;
+        const int maxIter = 5000;
+        int prev = -1;
+        bool strictlyIncreasing = true;
+        bool inRange = true;
+        for (int iter = 1; iter < maxIter; ++iter) {
+            int recordNum = (int)((double)iter * allRot / maxIter);
+            if (recordNum >= allRot) recordNum = allRot - 1;
+            if (recordNum <= 0 || recordNum >= allRot) inRange = false;
+            if (recordNum <= prev) strictlyIncreasing = false;
+            prev = recordNum;
+        }
+        CHECK(inRange);
+        CHECK(strictlyIncreasing);
+        int firstRec = (int)((double)1 * allRot / maxIter);
+        int lastRec = (int)((double)(maxIter - 1) * allRot / maxIter);
+        CHECK(firstRec == 1);
+        CHECK(lastRec == 7998);
+    }
 }

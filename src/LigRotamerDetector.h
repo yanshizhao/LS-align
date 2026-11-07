@@ -11,7 +11,7 @@ using namespace std;
 
 #define NRS_ROTATABLE_BOND_NUM 3
 #define NRS_MIN_ROTATABLE_BOND_NUM 3
-#define NRS_LEGACY_UNPARAM_BOND_NUM 5	// differs from the paper (3); see R5
+#define NRS_LEGACY_UNPARAM_BOND_NUM 5	// legacy value; after R5 only sampler tests use it
 #define ROTATABLE_BOND_MIN_SIDE_ATOMS 4
 
 class LigRotamerDetector{
@@ -148,84 +148,6 @@ public:
 	
 	double** getOrigLigDisMtx(){
 		return origLigDisMtx;
-	}
-
-	/****************************************************
-	 * rotate the rotatable single bond to generate the 
-	 * available rotamers.
-	 ****************************************************/
-	vector<Ligand> generateRotamers(){
-		vector<Ligand> ans;
-		vector<BondInfo> singleBonds = findAllSingleBond();
-		if (0 == singleBonds.size()){
-			return ans;
-		}
-
-		vector<vector<vector<int> > > twoPartsIndss = getUsefulBondTwoPartIndsInfo(&singleBonds);
-		if (0 == twoPartsIndss.size()){
-			return ans;
-		}
-
-		// select 5 avaliable single bond
-		vector<int> selectNIndsOfSignleBonds = select_N_RotableSingleBondOnUniformDistribution(twoPartsIndss, singleBonds, NRS_LEGACY_UNPARAM_BOND_NUM);
-		
-		int all_rotamer_num = (int)pow(rotAngles.size(), selectNIndsOfSignleBonds.size());
-
-		int max_iter_num = all_rotamer_num;
-		if (isWantedSaveTimeUsingRandomSelect && all_rotamer_num > 5000){
-			max_iter_num = 5000;
-		}
-
-		int* mod_ref_arr = new int[selectNIndsOfSignleBonds.size()];
-		for (int i = 0; i < selectNIndsOfSignleBonds.size(); i++){
-			mod_ref_arr[i] = (int)pow(rotAngles.size(), (int)selectNIndsOfSignleBonds.size()-1-i);
-		}
-
-		for (int iter = 1; iter < max_iter_num; iter++){			// the rotamer set does not include itself.
-			int i = 0;
-			
-			int recordNum = iter;
-			if (isWantedSaveTimeUsingRandomSelect && all_rotamer_num > 5000){
-				// X1: deterministic decimation (evenly spaced, reproducible)
-				recordNum = (int)((double)iter * all_rotamer_num / max_iter_num);
-				if (recordNum >= all_rotamer_num) recordNum = all_rotamer_num - 1;
-			}
-
-			double* angles = new double[selectNIndsOfSignleBonds.size()];
-			for (i = 0; i < selectNIndsOfSignleBonds.size(); i++){                                                                         
-				int mod_ref = mod_ref_arr[i];
-				int iInd = recordNum / mod_ref;                                                                                        
-				angles[i] = rotAngles[iInd];                                                                                           
-				
-				recordNum -= iInd*mod_ref;                                                                                             
-			}
-			
-			// rotated selected single bond with different angles;
-			Ligand* p_decoy = new Ligand(lig);
-			for (i = 0; i < selectNIndsOfSignleBonds.size(); i++){
-				BondInfo bi = singleBonds[selectNIndsOfSignleBonds[i]];
-				vector<vector<int> > twoPartInds = twoPartsIndss[selectNIndsOfSignleBonds[i]];
-				
-				double angle = angles[i];                                                                                              
-				if (angle == 0.0)
-					continue;
-
-				rotatedLigandOnePartOfOneBond(p_decoy, bi, twoPartInds, angle);
-			}
-			
-			if (!judgeIsOverlapAtomsInLig(p_decoy)){
-				ans.push_back(*p_decoy);
-			}
-			delete p_decoy;
-			p_decoy = NULL;
-
-			delete[] angles;
-			angles = NULL;
-		}		
-
-		delete[] mod_ref_arr;
-		mod_ref_arr = NULL;
-		return ans;
 	}
 
 	/****************************************************

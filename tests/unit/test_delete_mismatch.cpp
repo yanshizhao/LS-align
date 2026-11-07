@@ -54,14 +54,24 @@ TEST(no_delete_mismatch_shortestroad) {
 TEST(no_delete_mismatch_rotamer_c13) {
     /* pre-fix: 170 mismatches on the C13 chain (169 in the detector ctor --
      * ShortestRoad, plus 1 x B5 inside generateRotamers()).  Reading delta()
-     * before the detector is destroyed skips its own B12 (+1). */
+     * before the detector is destroyed skips its own B12 (+1).
+     * R5 removed the no-arg generateRotamers(); the aligned-bond filter is a
+     * no-op on an empty initial alignment, so the surviving with-arg (N=3)
+     * entry point still routes through select_N and its delete[]. */
     Ligands ligs("fixtures/chain_c13.mol2", false);
     std::vector<Ligand> all = ligs.getLigands();
     Ligand L = all[0];
 
+    Ligands ta("fixtures/tiny.mol2", false);
+    Ligands tb("fixtures/unrelatedB.mol2", false);
+    std::vector<Ligand> tav = ta.getLigands();
+    std::vector<Ligand> tbv = tb.getLigands();
+    RigidLSalign rigid(tav[0], tbv[0], 0.1);
+    CHECK(rigid.getFinalAlignedPair().empty());
+
     MismatchDelta d;
     LigRotamerDetector rd(L);
-    std::vector<Ligand> rot = rd.generateRotamers();
+    std::vector<Ligand> rot = rd.generateRotamers(&rigid);
     (void)rot;
 
     /* correct behaviour: no delete/delete[] mismatch */
