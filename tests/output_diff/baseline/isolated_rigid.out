@@ -1,12 +1,4 @@
 
         QEURY_NAME         TEMPL_NAME PC-score8Q PC-score8T  Pval_PC8Q  Pval_PC8T   JaccardR    RMSD_lb    QUERY_SIZE     TEMPL_SIZE 
                                                                                                          (Without "H")  (Without "H")
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
-scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem
           ISOLATED               TINY     0.4487     0.4487   0.001165   0.001165     0.0000     1.5579              4              4

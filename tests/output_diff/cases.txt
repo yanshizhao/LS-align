@@ -6,7 +6,10 @@
 #
 # 说明：
 #   * 只登记"需要输出级逐字节比对"的用例；单元/CLI 断言不在此列（见 unit/、cli/）。
-#   * 运行前会剥离不确定行（Using/Totally Using 计时）并归一化路径。
+#   * stdout 与 stderr 分开记录、分开比对：baseline/<name>.out / .err，
+#     current/<name>.out / .err，差异分别落到 diffs/<name>.out.diff / .err.diff。
+#     因此诊断进 stderr（B27）后，结果表仍在 .out 里逐字节比对。
+#   * 运行前会剥离不确定行（Using/Totally Using 计时）并归一化行尾/路径。
 #   * 制动模式(-rf 0)确定性最好；柔性(-rf 1)含 rand() 抽样，仅在确定性可控时纳入。
 #
 # 格式： name                     workdir          args                                                   mode

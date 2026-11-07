@@ -6,11 +6,19 @@ Design (adapted from usalign-refactor-tests-framework/cLanguage2Cplus):
   current/  : outputs of the current build (regenerated each run).
   diffs/    : unified diffs for any mismatch.
 
+stdout and stderr are captured, normalized and compared SEPARATELY:
+  baseline/<name>.out  vs current/<name>.out   (result table + timing)
+  baseline/<name>.err  vs current/<name>.err   (diagnostics)
+A case passes only when every stream matches; mismatches produce
+diffs/<name>.out.diff and/or diffs/<name>.err.diff.  Keeping the streams apart
+is what lets B27 (diagnostics moved to stderr) be verified: the result table
+must stay byte-identical while diagnostics leave stdout.
+
 Two case modes (see cases.txt):
-  exact          -> business data MUST be byte-identical (A-batch / F-series / refactors).
-  expected:KEY   -> output may change, but it MUST differ from baseline and the diff
-                    is left in diffs/ for human review against expected/KEY.json
-                    (e.g. a constant->coverage mapping in R8).
+  exact          -> both streams MUST be byte-identical (A-batch / F-series / refactors).
+  expected:KEY   -> at least one stream may change, but the output MUST differ from
+                    baseline and the diffs are left in diffs/ for human review
+                    against expected/KEY.json (e.g. a constant->coverage mapping in R8).
 
 Normalization before compare:
   * strip volatile timing lines  "Using ...-s", "Totally Using ...-s"
@@ -70,18 +78,18 @@ def resolveWorkdir(rel):
     return candExample
 
 
-def runCase(workdirRel, args, outPath):
-    """Run one case and write its normalized output to outPath.
+def runCase(workdirRel, args, outPath, errPath):
+    """Run one case and write its normalized stdout/stderr to outPath/errPath.
 
-    LS-align always exits 1 (even on success), so the return code is reported
-    only for diagnostics; pass/fail is decided by output comparison.
+    Output comparison decides pass/fail, as before; the return code is reported
+    only for diagnostics (it is 0 on success after B28).
     """
     workdir = resolveWorkdir(workdirRel)
     cmd = [str(BIN)] + args.split()
     proc = subprocess.run(cmd, capture_output=True, text=True,
                           encoding="utf-8", errors="replace", cwd=str(workdir))
-    content = cleanText(proc.stdout + proc.stderr)
-    writeText(outPath, content)
+    writeText(outPath, cleanText(proc.stdout))
+    writeText(errPath, cleanText(proc.stderr))
     return proc.returncode
 
 
@@ -97,20 +105,32 @@ def diffText(basePath, curPath, tag):
     return "FAIL"
 
 
-def checkExpected(name, basePath, curPath, key):
+def compareStreams(name):
+    """Compare stdout and stderr independently.
+
+    Returns (allMatch, anyDifference); diffs/<name>.out.diff and/or
+    diffs/<name>.err.diff are written for whichever stream differs.
+    """
+    outRes = diffText(BASELINE / f"{name}.out", CURRENT / f"{name}.out", f"{name}.out")
+    errRes = diffText(BASELINE / f"{name}.err", CURRENT / f"{name}.err", f"{name}.err")
+    return (outRes == "PASS" and errRes == "PASS"), (outRes != "PASS" or errRes != "PASS")
+
+
+def checkExpected(name, key):
     """For mode=expected:KEY.
 
-    Light-weight contract: the case must (a) differ from the baseline (the
-    change IS expected) and (b) expected/KEY.json must exist.  The unified diff
-    is kept in diffs/<name>.diff for human review against the envelope declared
-    in expected/KEY.json; this runner does not auto-validate numeric fields.
+    Light-weight contract: the case must (a) differ from the baseline in at
+    least one stream (the change IS expected) and (b) expected/KEY.json must
+    exist.  The unified diffs are kept in diffs/<name>.{out,err}.diff for human
+    review against the envelope declared in expected/KEY.json; this runner does
+    not auto-validate numeric fields.
     """
     specPath = EXPECTED / f"{key}.json"
     if not specPath.exists():
         print(f"  WARNING: expected spec {specPath} missing -> treat as FAIL")
         return "FAIL"
     json.loads(specPath.read_text(encoding="utf-8"))     # reject malformed JSON
-    if diffText(basePath, curPath, name) == "PASS":
+    if not compareStreams(name)[1]:
         print("  FAIL: mode=expected but output identical to baseline (no change seen)")
         return "FAIL"
     return "EXPECTED-DIFF"
@@ -167,43 +187,45 @@ def main():
         if onlyCase and name != onlyCase:
             continue
         total += 1
-        cur = CURRENT / f"{name}.out"
-        rc = runCase(workdir, args, cur)
-        base = BASELINE / f"{name}.out"
+        curOut = CURRENT / f"{name}.out"
+        curErr = CURRENT / f"{name}.err"
+        rc = runCase(workdir, args, curOut, curErr)
+        baseOut = BASELINE / f"{name}.out"
+        baseErr = BASELINE / f"{name}.err"
 
         if genBaseline:
-            writeText(base, cur.read_text(encoding="utf-8"))
+            writeText(baseOut, curOut.read_text(encoding="utf-8"))
+            writeText(baseErr, curErr.read_text(encoding="utf-8"))
             print(f"  [BASELINE] {name} (rc={rc})")
             continue
 
-        if not base.exists():
+        if not baseOut.exists() or not baseErr.exists():
             print(f"  [MISSING] {name}: no baseline (run --baseline first)")
             failed += 1
             continue
 
         if mode == "exact":
-            res = diffText(base, cur, name)
-            if res == "PASS":
+            if compareStreams(name)[0]:
                 print(f"  [  OK  ] {name} (rc={rc})")
                 passed += 1
             else:
-                print(f"  [ FAIL] {name} -> diffs/{name}.diff")
+                print(f"  [ FAIL] {name} -> diffs/{name}.out.diff / {name}.err.diff")
                 failed += 1
         elif mode.startswith("expected:"):
             key = mode.split(":", 1)[1]
-            res = checkExpected(name, base, cur, key)
+            res = checkExpected(name, key)
             if res == "EXPECTED-DIFF":
-                print(f"  [ WARN ] {name}: change matches expected:{key} (review diffs/{name}.diff)")
+                print(f"  [ WARN ] {name}: change matches expected:{key} (review diffs/{name}.{{out,err}}.diff)")
                 warned += 1
             else:
-                print(f"  [ FAIL] {name} -> diffs/{name}.diff")
+                print(f"  [ FAIL] {name}")
                 failed += 1
         else:
             print(f"  [ FAIL] {name}: unknown mode {mode}")
             failed += 1
 
     if genBaseline:
-        print(f"\n=== baseline written: {total} cases ===")
+        print(f"\n=== baseline written: {total} cases (.out + .err) ===")
         return
     if onlyCase and total == 0:
         print(f"ERROR: no case named '{onlyCase}' in cases.txt")

@@ -18,13 +18,31 @@
 ```
 output_diff/
 ├── cases.txt          # 用例清单：name | workdir | args | mode
-├── output_diff.py     # runner（Python；剥离时序行 + 归一化 + 分类比对）
+├── output_diff.py     # runner（Python；剥离时序行 + 归一化 + 按流分类比对）
 ├── baseline/          # 黄金标准输出（提交进 git，不可随意改）
-├── current/           # 每次运行输出（可删）
-├── diffs/             # 不匹配时的 unified diff（可删）
+│   ├── <name>.out     #   stdout：表头 + 数据行 + 计时
+│   └── <name>.err     #   stderr：诊断
+├── current/           # 每次运行输出（可删；同名 .out / .err 两份）
+├── diffs/             # 不匹配时的 unified diff（可删；<name>.out.diff / <name>.err.diff）
 ├── expected/          # R 批次"期望差异清单"（JSON）
 └── README.md
 ```
+
+## stdout / stderr 两路比对
+
+每条用例的 stdout 与 stderr **分别记录、分别比对**（早期版本把两者拼接后比对，
+B27 把诊断从 stdout 换到 stderr 后拼接顺序改变，会制造假差异）：
+
+| 流 | 基线文件 | 当前文件 | 差异文件 | 内容 |
+|---|---|---|---|---|
+| stdout | `baseline/<name>.out` | `current/<name>.out` | `diffs/<name>.out.diff` | 结果表（空行 + 2 行表头 + 数据行）+ 3 行计时 |
+| stderr | `baseline/<name>.err` | `current/<name>.err` | `diffs/<name>.err.diff` | 诊断（如 `has a problem`、解析错误） |
+
+- `exact`：**两路都必须逐字节一致**；任一路不同即 FAIL，只给不同的那一路出 diff。
+- `expected:KEY`：**至少一路**必须与基线不同（说明改动生效）；存在差异即 WARN，
+  两路 diff 都保留供人工核对。
+- 无诊断的用例 `baseline/<name>.err` 是空文件（0 字节），仍须存在；`--baseline` 会为
+  全部用例写出 `.out` + `.err` 两份。
 
 ## 用例模式（`cases.txt` 末列）
 
@@ -55,6 +73,7 @@ python output_diff/output_diff.py --case ace_rigid
 - **剥离时序行**：`Using 0.003-s to load mol2 files.` / `Using 0.001-s to do LS-align.` / `Totally Using 0.004-s.`（数值每次不同）
 - **换行归一化**：`\r\n` / 单独 `\r` / 连续换行统一为 `\n`
 - **写入固定 LF**：`current/`、`baseline/`、`diffs/` 均以 `newline="\n"` 写出，Windows 与 Linux 跑出的 baseline 字节一致（与 `tests/**` 的 LF 约定相同）
+- **两路独立归一化**：`.out` 与 `.err` 各自执行上述剥离/归一化后比对，互不影响
 - 路径前缀差异（workdir 不同）不体现在表体里，无需额外处理
 
 ## 与 R 批（会改数值）的配合
@@ -75,5 +94,5 @@ output_diff 提供更广的用例、模式区分和 diff 归档；两者不冲�
 ## 环境注意
 
 - 二进制在 `../build/LSalign_under_test`（`make` 产物）。
-- LS-align **始终退出 1**（成功也返回 1），本 runner 不依赖退出码判定成败，只凭输出比对。
+- 退出码：B28 之后成功为 0、失败为 1；本 runner 仍不依赖退出码判定成败，只凭输出比对（rc 仅打印作参考）。
 - 柔性用例（`-rf 1`）含 `srand(clock())` 随机抽样——`octane_flex`/`ace_flex` 之所以能纳入 `exact`，是因为当前数据下抽样路径确定（构象数 < 5000，不触发随机子集）。若将来用例触发随机抽样，应移出 `exact` 或固定种子。
