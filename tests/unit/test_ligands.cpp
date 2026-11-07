@@ -216,9 +216,15 @@ TEST(f6_const_ref_no_copy) {
     const std::vector<std::vector<BondType> >& a = M.getAtomBondTypes();
     const std::vector<std::vector<BondType> >& b = M.getAtomBondTypes();
     CHECK(&a == &b);
-    /* Ligands::operator[] returns the stored element, not a fresh copy: two
-     * such addresses compared in one full-expression would differ otherwise. */
-    CHECK(&ligs[0] == &ligs[0]);
+    /* Ligands::operator[] must return the stored element, not a fresh copy:
+     * binding the same element twice must yield one address.  (A by-value
+     * operator[] binds two distinct temporaries and turns this red.) */
+    const Ligand& first = ligs[0];
+    const Ligand& second = ligs[0];
+    CHECK(&first == &second);
+    /* and a getter reached through operator[] is not a reference into a
+     * temporary: it must be the vector owned by the stored element */
+    CHECK(&ligs[0].getPoints() == &first.getPoints());
 }
 
 /* ---- F6: atomBondTypes.size() == points.size() even with isolated atoms ---- */
