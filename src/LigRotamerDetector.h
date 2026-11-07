@@ -10,6 +10,11 @@ using namespace std;
 
 #define DOUBLE_PI 6.283185307179586	// 2 * 3.141592653589793
 
+#define NRS_ROTATABLE_BOND_NUM 3
+#define NRS_MIN_ROTATABLE_BOND_NUM 3
+#define NRS_LEGACY_UNPARAM_BOND_NUM 5	// differs from the paper (3); see R5
+#define ROTATABLE_BOND_MIN_SIDE_ATOMS 4
+
 class LigRotamerDetector{
 private:
 	Ligand lig;
@@ -163,7 +168,7 @@ public:
 		}
 
 		// select 5 avaliable single bond
-		vector<int> selectNIndsOfSignleBonds = select_N_RotableSingleBondOnUniformDistribution(twoPartsIndss, singleBonds, 5);
+		vector<int> selectNIndsOfSignleBonds = select_N_RotableSingleBondOnUniformDistribution(twoPartsIndss, singleBonds, NRS_LEGACY_UNPARAM_BOND_NUM);
 		
 		int all_rotamer_num = (int)pow(rotAngles.size(), selectNIndsOfSignleBonds.size());
 
@@ -299,7 +304,7 @@ public:
 		}
 
 		// select 3 avaliable single bond
-		vector<int> selectNIndsOfSignleBonds = select_N_RotableSingleBondOnUniformDistribution(twoPartsIndss, singleBonds, 3);
+		vector<int> selectNIndsOfSignleBonds = select_N_RotableSingleBondOnUniformDistribution(twoPartsIndss, singleBonds, NRS_ROTATABLE_BOND_NUM);
 		
 		int all_rotamer_num = (int)pow(rotAngles.size(), selectNIndsOfSignleBonds.size());
 
@@ -384,8 +389,8 @@ private:
 	// return the select index in singleBonds
 	vector<int> select_N_RotableSingleBondOnUniformDistribution(vector<vector<vector<int> > > twoPartsIndss, 
 		vector<BondInfo> singleBonds, int N){
-		if (N < 3){
-			N = 3;
+		if (N < NRS_MIN_ROTATABLE_BOND_NUM){
+			N = NRS_MIN_ROTATABLE_BOND_NUM;
 		}
 
 		int i = 0, j = 0;
@@ -399,6 +404,11 @@ private:
 		vector<int> samllPartAtomNums; 
 		vector<int> smallPartAtomInds;	// content just 0 / 1
 		for (i = 0; i < singleBonds.size(); i++){
+			if (i >= (int)twoPartsIndss.size() || twoPartsIndss[i].size() < 2){
+				cerr << "ERROR: rotamer sampling: bond " << i
+					<< " lacks two atom sides; aborting" << endl;
+				return vector<int>();
+			}
 			int aPartAtomNum = twoPartsIndss[i][0].size();
 			int bPartAtomNum = twoPartsIndss[i][1].size();
 			
@@ -414,7 +424,12 @@ private:
 		}
 
 		int* index = ascentInsertSortIndex(samllPartAtomNums);
-		
+		if (samllPartAtomNums.size() < 2){
+			cerr << "ERROR: rotamer sampling: fewer than 2 usable bonds; aborting" << endl;
+			delete[] index;
+			return vector<int>();
+		}
+
 		vector<int> sortedSIInds;
 		sortedSIInds.push_back(index[0]);
 		sortedSIInds.push_back(index[1]);
@@ -617,8 +632,8 @@ private:
 			
 			
 			if (0 == twoPartInds.size()
-					|| twoPartInds[0].size() <= 3
-					|| twoPartInds[1].size() <= 3
+					|| twoPartInds[0].size() < ROTATABLE_BOND_MIN_SIDE_ATOMS
+					|| twoPartInds[1].size() < ROTATABLE_BOND_MIN_SIDE_ATOMS
 					/*|| 1.0*twoPartInds[0].size()/ligsize <= 0.25                                                                       
 					|| 1.0*twoPartInds[1].size()/ligsize <= 0.25*/){
 				continue;

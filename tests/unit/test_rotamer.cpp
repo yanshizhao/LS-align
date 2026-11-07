@@ -100,6 +100,37 @@ TEST(b26_indices_identical) {
           && sel5[2] == 1 && sel5[3] == 0 && sel5[4] == 5);
 }
 
+/* F8: the magic numbers are named; the values must stay identical to the
+ * literals they replaced (behaviour-preserving refactor). */
+TEST(f8_macro_values) {
+    CHECK(NRS_ROTATABLE_BOND_NUM == 3);
+    CHECK(NRS_MIN_ROTATABLE_BOND_NUM == 3);
+    CHECK(NRS_LEGACY_UNPARAM_BOND_NUM == 5);
+    CHECK(ROTATABLE_BOND_MIN_SIDE_ATOMS == 4);
+}
+
+/* F8: every index the sampler returns must be a valid index into singleBonds,
+ * for both the N=3 (main path) and N=5 (legacy unparameterised path) calls. */
+TEST(f8_chain_c13_index_range) {
+    int s = 0;
+    std::vector<int> sel3 = b26SelectC13(3, s);
+    CHECK(s == 6);
+    CHECK(sel3.size() == 3);
+    for (std::size_t i = 0; i < sel3.size(); ++i)
+        CHECK(sel3[i] >= 0 && sel3[i] < s);
+
+    std::vector<int> sel5 = b26SelectC13(5, s);
+    CHECK(sel5.size() == 5);
+    for (std::size_t i = 0; i < sel5.size(); ++i)
+        CHECK(sel5[i] >= 0 && sel5[i] < s);
+
+    /* the sampler clamps N up to the minimum (here the ligand yields s=6) */
+    std::vector<int> sel0 = b26SelectC13(0, s);
+    CHECK(sel0.size() == NRS_MIN_ROTATABLE_BOND_NUM);
+    for (std::size_t i = 0; i < sel0.size(); ++i)
+        CHECK(sel0[i] >= 0 && sel0[i] < s);
+}
+
 /* ================= B31 + B33 (ShortestRoad robustness) ================= */
 
 static double** b33AdjFromLigand(Ligand& L) {
