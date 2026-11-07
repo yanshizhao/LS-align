@@ -2,6 +2,7 @@
 #define SHORTESTROAD_H
 
 #include "basic_fun.h"
+#include <climits>
 
 using namespace std;
 
@@ -13,8 +14,25 @@ private:
 	int** allRoadLen8Floyd;
 
 	vector<int> longestShortestRoad8Floyd;
+	bool m_isValid;
 public:
+	// Upper bound on the atom count of one ligand: 300^3 ints ~= 108 MB.
+	static const int MAX_FLOYD_NODES = 300;
+
 	ShortestRoad(double** adjmap, int node_num){
+		// Reject before allocating: n^3 ints is ~108 MB at n = 300.
+		// The n > INT_MAX/n/n test keeps the n^3 product from overflowing.
+		if (node_num <= 0 || node_num > MAX_FLOYD_NODES
+			|| node_num > INT_MAX / node_num / node_num){
+			this->adjmap = NULL;
+			p_node_num = NULL;
+			allRoad8Floyd = NULL;
+			allRoadLen8Floyd = NULL;
+			m_isValid = false;
+			return;
+		}
+		m_isValid = true;
+
 		this->adjmap = new2DArr(node_num, node_num);
 		for (int i = 0; i < node_num; i++){
 			for (int j = 0; j < node_num; j++){
@@ -32,7 +50,11 @@ public:
 	}		
 	
 	int getNodeNum(){
-		return *p_node_num;
+		return (NULL != p_node_num) ? *p_node_num : 0;
+	}
+	
+	bool isValid() const {
+		return m_isValid;
 	}
 	
 	vector<int> getLongestShortestRoad8Floyd(){

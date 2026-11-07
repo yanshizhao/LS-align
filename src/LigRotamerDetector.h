@@ -591,6 +591,14 @@ private:
 		ShortestRoad* p_sroad = new ShortestRoad(adjacencyMtx, node_num); 
 		
 		release2DArr(node_num, adjacencyMtx);
+		// B31: report the rejection on stderr; callers see isValid() == false
+		// and skip every bond through leftRightPartOnBond().
+		if (NULL != p_sroad && !p_sroad->isValid()){
+			int maxNodes = ShortestRoad::MAX_FLOYD_NODES;
+			cerr << "ERROR: ligand '" << lig.getLigname() << "' has "
+				<< node_num << " atoms, above the supported maximum of "
+				<< maxNodes << "; skipped" << endl;
+		}
 		return p_sroad;
 	}	
 	
@@ -626,6 +634,11 @@ private:
 	
 	vector<vector<int> > leftRightPartOnBond(BondInfo onebond){ 
 		int i = 0, j = 0, endInd = 0;
+
+		// B31: an oversized ligand leaves ShortestRoad unusable; skip the bond.
+		if (NULL == p_sroad || !p_sroad->isValid()){
+			return vector<vector<int> >();
+		}
 
 		int node_num = lig.size();
 		                                                  
