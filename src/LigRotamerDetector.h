@@ -558,7 +558,7 @@ private:
 		vector<Point3D> _poss;
 		for (i = 0; i < p_lig->size(); i++){                                                                                  
 			if (false == isSet[i]) {                                                                                                 
-				cout << "ERROR: 201702161138" << endl;
+				cerr << "ERROR: 201702161138" << endl;
 				// write to log
 			} else _poss.push_back(newPoss[i]);                                                                                            
 		}

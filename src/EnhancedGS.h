@@ -253,8 +253,8 @@ private :
 				for (i = 0; i < rownum; i++)
 					alivec[i] = newAlivec[i];
 			}else if (newScore < oScore){
-				cout << newScore << "\t" << oScore << endl;  
-				cout << "You have a wrong in testLoopEnhanceGreedySearch" << endl;
+				cerr << newScore << "\t" << oScore << endl;  
+				cerr << "You have a wrong in testLoopEnhanceGreedySearch" << endl;
 			}else {
 				break;
 			}
@@ -323,7 +323,7 @@ private :
 				if (-1 != col_ind) 
 					incVal = scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind];
 				if (incVal < 0){
-					cout << "scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem" << endl;
+					cerr << "scoMtx[row_ind][new_col_ind] - scoMtx[row_ind][col_ind]; has a problem" << endl;
 				}
 				
 				// calculate the decrease value
@@ -348,7 +348,7 @@ private :
 			}
 			
 			if (maxScoreChange > 0.0 && exchange_row_ind < 0){
-				cout << " ---------------88-------------------- " << endl;
+				cerr << " ---------------88-------------------- " << endl;
 			}
 
 			if (maxScoreChange > 0.0){

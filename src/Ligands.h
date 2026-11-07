@@ -187,7 +187,7 @@ public:
 				BondType bt = bondInfoes[i].bt;
 				
 				if (aInd == bInd){
-					cout << "getBondTypeMtx says " << aInd << "\t=\t" << bInd << endl;
+					cerr << "getBondTypeMtx says " << aInd << "\t=\t" << bInd << endl;
 				}
 				
 				btMtx[aInd][bInd] = bt;
@@ -216,7 +216,7 @@ public:
 				double dist = bondInfoes[i].bondDis;
 				
 				if (aInd == bInd){
-					cout << "getBondTypeMtx says " << aInd << "\t=\t" << bInd << endl;
+					cerr << "getBondTypeMtx says " << aInd << "\t=\t" << bInd << endl;
 				}
 				
 				bondDisMtx[aInd][bInd] = dist;
