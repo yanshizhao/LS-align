@@ -1190,6 +1190,7 @@ private:
 	/***************************************************************************************
 	 * This function is a sub function for "calculateBondInfoScoMtx" function
 	 ***************************************************************************************/
+	// NOTE: NOT the paper's BWJS (Eq.4); it is bond-length-weighted coordination-number matching with a weak bond-type preference (see README, Implementation notes).
  	double similar4TwoAtom8BondInfo(vector<BondType> aAtomBondTypes, vector<double> aAtomBondDis, 
 			vector<BondType> bAtomBondTypes, vector<double> bAtomBondDis){
 		vector<vector<double> > itemScoMtx;
