@@ -17,7 +17,7 @@ private:
 	
 	// tmp
 	double** origLigDisMtx;		
-	bool isWantedSaveTimeUsingRandomSelect;	// ÅÐ¶ÏÊÇ·ñÐèÒªÔÚ µ±rotamer number > 5000µÄÊ±ºòËæ»úÑ¡Ôñ5000¸ö£¬ ÒÔÆÚ¼õÉÙÊ±¼ä¡£
+	bool isWantedSaveTimeUsingRandomSelect;	// ï¿½Ð¶ï¿½ï¿½Ç·ï¿½ï¿½ï¿½Òªï¿½ï¿½ ï¿½ï¿½rotamer number > 5000ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½Ñ¡ï¿½ï¿½5000ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ú¼ï¿½ï¿½ï¿½Ê±ï¿½ä¡£
 
 	// const final 
 	vector<double> rotAngles;
@@ -514,8 +514,8 @@ private:
 			bigPartAtomIndInBond = bi.bInd;            
 		}
 		
-		Point3D* rot_axis = p_lig->getIthPoints(smallPartAtomIndInBond) - p_lig->getIthPoints(bigPartAtomIndInBond);	// need release
-		double** rotMtx = generateRotatedCoordinate(*rot_axis, angle);			// need release
+		Point3D rot_axis = p_lig->getIthPoints(smallPartAtomIndInBond) - p_lig->getIthPoints(bigPartAtomIndInBond);
+		double** rotMtx = generateRotatedCoordinate(rot_axis, angle);			// need release
 		
 		// around the bigPartAtomIndInBond point to rotated the small part
 		Point3D rotation_point = p_lig->getIthPoints(bigPartAtomIndInBond);
@@ -568,8 +568,6 @@ private:
 		delete[] isSet;
 		isSet = NULL;
 		release2DArr(3, rotMtx);
-		delete rot_axis;
-		rot_axis = NULL;   
 		delete[] newPoss;
 		newPoss = NULL;
 	}

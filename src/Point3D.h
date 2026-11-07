@@ -30,28 +30,16 @@ public:
 		
 	~Point3D(){}
 		
-	Point3D* operator+ (const Point3D& point){
-		double ans_x = x + point.x;
-		double ans_y = y + point.y;
-		double ans_z = z + point.z;
-		
-		return new Point3D(ans_x, ans_y, ans_z);
-	}
-	
-	Point3D* operator- (const Point3D& point){
-		double ans_x = x - point.x;
-		double ans_y = y - point.y;
-		double ans_z = z - point.z;
-		
-		return new Point3D(ans_x, ans_y, ans_z);
+	Point3D operator+ (const Point3D& point) const {
+		return Point3D(x + point.x, y + point.y, z + point.z);
 	}
 
-	Point3D* operator/ (int n){
-		double ans_x = x / n;
-		double ans_y = y / n;
-		double ans_z = z / n;
-		
-		return new Point3D(ans_x, ans_y, ans_z);
+	Point3D operator- (const Point3D& point) const {
+		return Point3D(x - point.x, y - point.y, z - point.z);
+	}
+
+	Point3D operator/ (int n) const {
+		return Point3D(x / n, y / n, z / n);
 	}
 	
 	/***************************************
