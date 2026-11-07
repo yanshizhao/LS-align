@@ -100,16 +100,25 @@ stdout table and check the exit status separately.
 ====================
 Output Format
 ====================
-QEURY_NAME: the query ligand name
-TEMPL_NAME: the template ligand name
-PC-score8Q:	the PC-score if normalized by atom number of Query Ligand
-PC-score8T: the PC-score if normalized by atom number of Template Ligand
-Pval_PC8Q:	the P-value of PC-score8Q based on statistic (Gumbel distribution)
-Pval_PC8T:	the P-value of PC-score8T based on statistic (Gumbel distribution)
-JaccardR:		the Jaccard ratio of this alignment 
-RMSD_LS:		the RMSD_LS of this alignment
-QUERY_SIZE: The atom number (without 'H') of the query ligand
-TEMPL_SIZE: The atom number (without 'H') of the template ligand
+QEURY_NAME:  the query ligand name (sic: "QUERY" is misspelled in the
+             program; the header is kept as-is for compatibility with
+             existing parsers)
+TEMPL_NAME:  the template ligand name
+PC-score8Q:  the alignment score normalized by the atom number of the query
+             ligand.  NOTE: this is the internal LS-score (the weighted sum
+             of distance, mass and bond-environment terms) divided by Nq.
+             It is NOT the PC-score defined in the paper.
+PC-score8T:  as above, normalized by the atom number of the template ligand
+Pval_PC8Q:   the P-value of PC-score8Q (Gumbel distribution)
+Pval_PC8T:   the P-value of PC-score8T (Gumbel distribution)
+JaccardR:    the Jaccard ratio of this alignment
+RMSD_lb:     the Vina lower-bound RMSD of this alignment
+             (NOT the aligned RMSD reported in the paper)
+QUERY_SIZE:  the number of query atoms loaded (hydrogens included with -H 1)
+TEMPL_SIZE:  the number of template atoms loaded (hydrogens included with -H 1)
+             The second header line, "(Without \"H\")" / "(With \"H\")",
+             is printed under these two columns and states whether hydrogen
+             atoms are included; it follows the -H option.
 
 (Some detail definitions can be found at http://zhanglab.ccmb.med.umich.edu/LS-align/ReportParam.html)
 
