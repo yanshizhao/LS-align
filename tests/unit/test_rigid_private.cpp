@@ -638,15 +638,18 @@ static double r1ReplayWithFourth(RigidLSalign& scratch, RigidLSalign& src,
     return scratch.getLSscore8QuerySize();
 }
 
-/* ZINC03814177 vs the ACE template: the two matrices are numerically far
- * apart, jun's seed score strictly beats all three other blocks, and the
- * detail-refined result differs from the pre-fix (bond in block 4) result. */
+/* ZINC03814184 vs the ACE template at d0=2.0: the two matrices are numerically
+ * far apart, jun's seed score strictly beats all three other blocks, and the
+ * detail-refined result differs from the pre-fix (bond in block 4) result.
+ * NOTE (R3): the absolute seed scores below were re-pinned after R3 enabled the
+ * multiscale search in the rough phase; the pre-R3 anchors (ZINC03814177) no
+ * longer have a strict jun win under the wider search. */
 TEST(r1_fourth_seed_uses_jun_matrix) {
     Ligands q("../example/ace_ligands.mol2", false);
     Ligands t("../example/xtal-lig.mol2", false);
     int idx = -1;
     for (int i = 0; i < (int)q.size(); ++i) {
-        if (q[i].getLigname() == "ZINC03814177") { idx = i; break; }
+        if (q[i].getLigname() == "ZINC03814184") { idx = i; break; }
     }
     CHECK(idx >= 0);
     if (idx < 0) return;
@@ -660,16 +663,16 @@ TEST(r1_fourth_seed_uses_jun_matrix) {
     CHECK(ali.junBondInfoScoMtx[0][0] < 0.01);
     CHECK(ali.bondInfoScoMtx[0][0] > 0.4);
 
-    /* measured seed scores: mass 9.580804, vdW 9.599709, bond 9.989799,
-     * jun 10.099036.  jun is the strict winner, so block 4 is selected. */
+    /* measured seed scores: mass 12.677449, vdW 12.677449, bond 12.507831,
+     * jun 14.800251.  jun is the strict winner, so block 4 is selected. */
     r1SeedRun runMass = r1RunSeed(ali, ali.massDiffScoMtx);
     r1SeedRun runVdwr = r1RunSeed(ali, ali.vdwRDiffScoMtx);
     r1SeedRun runBond = r1RunSeed(ali, ali.bondInfoScoMtx);
     r1SeedRun runJun  = r1RunSeed(ali, ali.junBondInfoScoMtx);
-    CHECK_CLOSE(runMass.ali->sco, 9.580804, 1e-5);
-    CHECK_CLOSE(runVdwr.ali->sco, 9.599709, 1e-5);
-    CHECK_CLOSE(runBond.ali->sco, 9.989799, 1e-5);
-    CHECK_CLOSE(runJun.ali->sco, 10.099036, 1e-5);
+    CHECK_CLOSE(runMass.ali->sco, 12.677449, 1e-5);
+    CHECK_CLOSE(runVdwr.ali->sco, 12.677449, 1e-5);
+    CHECK_CLOSE(runBond.ali->sco, 12.507831, 1e-5);
+    CHECK_CLOSE(runJun.ali->sco, 14.800251, 1e-5);
     CHECK(runJun.ali->sco > runMass.ali->sco);
     CHECK(runJun.ali->sco > runVdwr.ali->sco);
     CHECK(runJun.ali->sco > runBond.ali->sco);
@@ -677,36 +680,39 @@ TEST(r1_fourth_seed_uses_jun_matrix) {
 
     /* behaviour: the shipped align() result must equal the tournament whose
      * 4th block is junBondInfoScoMtx, and must differ from the pre-fix
-     * tournament whose 4th block was bondInfoScoMtx.  If :671 regresses to
-     * bondInfoScoMtx the first CHECK fails (measured 0.642652 vs 0.677101);
-     * if the 4th block is dead code the second CHECK fails. */
+     * tournament whose 4th block was bondInfoScoMtx.  If align() regresses to
+     * bondInfoScoMtx in block 4 the first CHECK fails (measured 0.547940 vs
+     * 0.649551); if the 4th block is dead code the second CHECK fails. */
     double withJun  = r1ReplayWithFourth(scratch, ali, ali.junBondInfoScoMtx);
     double withBond = r1ReplayWithFourth(scratch, ali, ali.bondInfoScoMtx);
 
-    CHECK_CLOSE(ali.getLSscore8QuerySize(), 0.677100953007, 1e-9);
-    CHECK_CLOSE(withJun, 0.677100953007, 1e-9);
-    CHECK_CLOSE(withBond, 0.642652394918, 1e-9);
+    CHECK_CLOSE(ali.getLSscore8QuerySize(), 0.649550537410, 1e-9);
+    CHECK_CLOSE(withJun, 0.649550537410, 1e-9);
+    CHECK_CLOSE(withBond, 0.547939632780, 1e-9);
     CHECK_CLOSE(ali.getLSscore8QuerySize(), withJun, 1e-12);
     CHECK(std::fabs(ali.getLSscore8QuerySize() - withBond) > 1e-3);
 }
 
-/* ZINC03814164 with the default d0 the CLI would pick: Nmin = 17, so
- * d0 = 0.55*(17-9)^(1/3) + 0.15 = 1.25 exactly.  With the fixed code the
- * final score is 0.5837018; the pre-fix block-4 matrix lands on
- * 0.5732641.  This pins the default-d0 path the CLI actually uses. */
+/* ZINC03814200 with the default d0 the CLI would pick: Nmin = 19, so
+ * d0 = 0.55*(19-9)^(1/3) + 0.15 = 1.334939...  With the fixed code the
+ * final score is 0.6700748; the pre-fix block-4 matrix lands on 0.6237836.
+ * This pins the default-d0 path the CLI actually uses.
+ * NOTE (R3): re-anchored from ZINC03814164 (d0=1.25 exactly) because under
+ * R3's multiscale rough search its 4th block no longer changes the result
+ * (jun and bond replays both land on the shipped score). */
 TEST(r1_fourth_seed_differs_from_bond_on_ace) {
     Ligands q("../example/ace_ligands.mol2", false);
     Ligands t("../example/xtal-lig.mol2", false);
     int idx = -1;
     for (int i = 0; i < (int)q.size(); ++i) {
-        if (q[i].getLigname() == "ZINC03814164") { idx = i; break; }
+        if (q[i].getLigname() == "ZINC03814200") { idx = i; break; }
     }
     CHECK(idx >= 0);
     if (idx < 0) return;
 
     int nMin = (int)q[idx].size() < (int)t[0].size() ? (int)q[idx].size() : (int)t[0].size();
     double d0 = 0.55 * std::pow(nMin - 9.0, 1.0 / 3.0) + 0.15;
-    CHECK_CLOSE(d0, 1.25, 1e-12);
+    CHECK_CLOSE(d0, 1.334939079518, 1e-9);
 
     RigidLSalign ali(q[idx], t[0], d0);
     RigidLSalign scratch(q[idx], t[0], d0);
@@ -714,8 +720,149 @@ TEST(r1_fourth_seed_differs_from_bond_on_ace) {
     double withJun  = r1ReplayWithFourth(scratch, ali, ali.junBondInfoScoMtx);
     double withBond = r1ReplayWithFourth(scratch, ali, ali.bondInfoScoMtx);
     CHECK_CLOSE(ali.getLSscore8QuerySize(), withJun, 1e-12);
-    /* measured: 0.5837018 (jun, shipped) vs 0.5732641 (pre-fix) */
-    CHECK_CLOSE(ali.getLSscore8QuerySize(), 0.583701782296, 1e-9);
-    CHECK_CLOSE(withBond, 0.573264100151, 1e-9);
+    /* measured: 0.6700748 (jun, shipped) vs 0.6237836 (pre-fix) */
+    CHECK_CLOSE(ali.getLSscore8QuerySize(), 0.670074793318, 1e-9);
+    CHECK_CLOSE(withBond, 0.623783648256, 1e-9);
     CHECK(std::fabs(ali.getLSscore8QuerySize() - withBond) > 1e-3);
+}
+
+/* ---- R3: multiscale sliding window ------------------------------------- *
+ * The window list was guarded by `if (L_min <= 4)`, and L_min = min(n_ali,4)
+ * is always <= 4, so the multiscale `else` branch was dead and every call ran
+ * a single window of length L_min.  The guard is now `if (n_ali <= 4)`, so an
+ * alignment longer than 4 atoms searches {n_ali, n_ali/2, ..., 4} (capped by
+ * max_win_type_num), while n_ali <= 4 is unchanged.
+ *
+ * L_init_vec is a local of nonsequentialUpdateAliInfo, so the cases observe
+ * the real function instead of re-implementing its window loop:
+ *   - max_win_type_num = 0 is the pre-R3 list exactly ({L_min});
+ *   - more windows can only raise the best score (strict `>` selection);
+ *   - each (window, slide) pair allocates a fixed number of blocks, so the
+ *     test TU's allocation counter (leak_probe.h) distinguishes one window
+ *     from many without depending on the loop's internals.
+ * Measured on the 40-atom synthetic pair below, step=1:
+ *   mw0=18213  mw1=18714  mw2=29173  mw3=44549  mw4=62334  mw5=62334  mw6=62334
+ * The three plateaus are the lists {4}, {40,4}, {40,20,4}, {40,20,10,4} and
+ * {40,20,10,5,4} -> widening max_win_type_num past 4 cannot add another
+ * entry, which is exactly "5 windows for n_ali=40". */
+
+static AlignInfo* r3Ali40(RigidLSalign& ali, int nPairs) {
+    int n = (int)ali.query.size();
+    int* alivec = new int[n];
+    int i = 0;
+    for (i = 0; i < n; ++i) alivec[i] = -1;
+    for (i = 0; i < nPairs; ++i) alivec[i] = i;
+    AlignInfo* ai = new AlignInfo(0.0, alivec, n);
+    delete[] alivec;
+    return ai;
+}
+
+static long r3AllocsForWindows(RigidLSalign& ali, int nPairs, int maxWin) {
+    AlignInfo* ai = r3Ali40(ali, nPairs);
+    double u[3][3];
+    double t[3];
+    long before = totalAllocs();
+    AlignInfo* r = ali.nonsequentialUpdateAliInfo(ai, 1, maxWin, false, u, t);
+    long after = totalAllocs();
+    delete r;
+    delete ai;
+    return after - before;
+}
+
+TEST(r3_window_list_grows_with_n_ali) {
+    Ligands q("fixtures/r3_query40.mol2", false);
+    Ligands t("fixtures/r3_templ40.mol2", false);
+    CHECK(q[0].size() == 40);
+    CHECK(t[0].size() == 40);
+    RigidLSalign ali(q[0], t[0], 2.0);
+
+    /* n_ali = 40: the single-window list (max_win_type_num 0, = pre-R3) is
+     * strictly cheaper than the multiscale list, and the list saturates at
+     * max_win_type_num = 4 -> {40,20,10,5,4}, five entries. */
+    long single = r3AllocsForWindows(ali, 40, 0);
+    long mw1 = r3AllocsForWindows(ali, 40, 1);
+    long mw2 = r3AllocsForWindows(ali, 40, 2);
+    long mw3 = r3AllocsForWindows(ali, 40, 3);
+    long mw4 = r3AllocsForWindows(ali, 40, 4);
+    long mw6 = r3AllocsForWindows(ali, 40, 6);
+    CHECK(single == 18213);
+    CHECK(mw1 == 18714);
+    CHECK(mw2 == 29173);
+    CHECK(mw3 == 44549);
+    CHECK(mw4 == 62334);
+    CHECK(mw6 == 62334);          /* cap reached at 4, not at 6 */
+    CHECK(mw1 > single);          /* {40,4} adds work */
+    CHECK(mw2 > mw1);             /* {40,20,4} */
+    CHECK(mw3 > mw2);             /* {40,20,10,4} */
+    CHECK(mw4 > mw3);             /* {40,20,10,5,4} */
+    CHECK(mw4 == mw6);
+
+    /* n_ali <= 4: always exactly one window ({n_ali}); max_win_type_num has
+     * no effect at all, matching the pre-R3 behaviour. */
+    int n = 0;
+    int mw = 0;
+    for (n = 1; n <= 4; ++n) {
+        long base = r3AllocsForWindows(ali, n, 0);
+        for (mw = 1; mw <= 6; ++mw) {
+            CHECK(r3AllocsForWindows(ali, n, mw) == base);
+        }
+    }
+    CHECK(r3AllocsForWindows(ali, 1, 6) == 491);
+    CHECK(r3AllocsForWindows(ali, 4, 6) == 497);
+
+    /* n_ali = 9: {9,4} saturates at max_win_type_num = 1, so the single
+     * window's count differs from the two-entry list while mw1..mw6 agree.
+     * Measured 2959 -> 3456. */
+    CHECK(r3AllocsForWindows(ali, 9, 0) == 2959);
+    CHECK(r3AllocsForWindows(ali, 9, 1) == 3456);
+    CHECK(r3AllocsForWindows(ali, 9, 6) == 3456);
+
+    /* n_ali = 13: {13,6,4}, i.e. exactly two extra windows.  Measured
+     * 4927 -> 5424 -> 9377, saturated from max_win_type_num = 2. */
+    CHECK(r3AllocsForWindows(ali, 13, 0) == 4927);
+    CHECK(r3AllocsForWindows(ali, 13, 1) == 5424);
+    CHECK(r3AllocsForWindows(ali, 13, 2) == 9377);
+    CHECK(r3AllocsForWindows(ali, 13, 6) == 9377);
+}
+
+/* The window search can only take the best score (it uses a strict '>'), so
+ * widening the window list must never lower the winner.  Numbers measured on
+ * ZINC01535869 x the ACE template at the CLI's default d0. */
+TEST(r3_more_windows_not_worse) {
+    Ligands q("../example/ace_ligands.mol2", false);
+    Ligands t("../example/xtal-lig.mol2", false);
+    int idx = -1;
+    for (int i = 0; i < (int)q.size(); ++i) {
+        if (q[i].getLigname() == "ZINC01535869") { idx = i; break; }
+    }
+    CHECK(idx >= 0);
+    if (idx < 0) return;
+
+    int nMin = (int)q[idx].size() < (int)t[0].size() ? (int)q[idx].size() : (int)t[0].size();
+    double d0 = 0.55 * std::pow(nMin - 9.0, 1.0 / 3.0) + 0.15;
+    RigidLSalign ali(q[idx], t[0], d0);
+
+    /* a long, valid alignment: the shipped 13-pair result of this pair */
+    std::vector<AlignedPair> pairs = ali.getFinalAlignedPair();
+    CHECK((int)pairs.size() == 13);
+    int n = (int)ali.query.size();
+    int* alivec = new int[n];
+    int i = 0;
+    for (i = 0; i < n; ++i) alivec[i] = -1;
+    for (i = 0; i < (int)pairs.size(); ++i) alivec[pairs[i].rowInd] = pairs[i].colInd;
+    AlignInfo baseInfo(0.0, alivec, n);
+    delete[] alivec;
+
+    AlignInfo single(baseInfo);
+    double u[3][3];
+    double t3[3];
+    AlignInfo* oldR = ali.nonsequentialUpdateAliInfo(&single, 1, 0, false, u, t3);
+    CHECK_CLOSE(oldR->sco, 10.207368797088, 1e-9);   /* pre-R3 single window {4} */
+    delete oldR;
+
+    AlignInfo multi(baseInfo);
+    AlignInfo* newR = ali.nonsequentialUpdateAliInfo(&multi, 1, 6, false, u, t3);
+    CHECK_CLOSE(newR->sco, 10.436078061110, 1e-9);   /* {13,6,4} wins */
+    CHECK(newR->sco > 10.207368797088);              /* strictly better, never worse */
+    delete newR;
 }

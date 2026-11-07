@@ -8,7 +8,7 @@ and full design.
 
 ```bash
 make test          # unit + cli  (default CI target; no DUD-E dataset, no ASan)
-make unit          # white-box unit tests (99 passed, 0 xfail, 0 xpass)
+make unit          # white-box unit tests (101 passed, 0 xfail, 0 xpass)
 make cli           # black-box CLI tests (8 scripts)
 make golden        # regenerate golden snapshots
 make check-golden  # diff current output vs golden

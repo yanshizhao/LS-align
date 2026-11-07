@@ -27,6 +27,7 @@
 
 namespace leakprobe {
 inline long& live() { static long n = 0; return n; }
+inline long& total() { static long n = 0; return n; }
 inline long& mismatch() { static long n = 0; return n; }
 
 const unsigned SCALAR_MAGIC = 0x5343414cu;
@@ -36,6 +37,7 @@ struct Header { unsigned magic; unsigned pad[3]; };
 }
 
 inline long liveAllocs() { return leakprobe::live(); }
+inline long totalAllocs() { return leakprobe::total(); }
 inline long mismatchCount() { return leakprobe::mismatch(); }
 
 /* Replacement allocator: route everything through malloc/free so the count is
@@ -46,6 +48,7 @@ inline void* lp_alloc(std::size_t n, unsigned tag) {
     if (!h) return 0;
     h->magic = tag;
     ++leakprobe::live();
+    ++leakprobe::total();
     return h + 1;
 }
 inline void lp_free(void* p, unsigned expected) {

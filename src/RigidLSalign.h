@@ -774,7 +774,7 @@ private:
 		}
 		int L_min = n_ali > 4 ? 4 : n_ali;
 		vector<int> L_init_vec;
-		if (L_min <= 4){
+		if (n_ali <= 4){
 			L_init_vec.push_back(L_min);
 		}else{
 			int win_type_num = 0;
