@@ -43,3 +43,16 @@ expected-failure cases in `unit/test_xfail.cpp` and `unit/test_delete_mismatch.c
 are now plain `TEST` regression locks. An XPASS is still a hard failure (it means
 a lock was left un-promoted); a `TEST` failing means the defect has regressed.
 New defect cases should be written directly as `TEST`.
+
+## Unreachable paths (R5)
+
+R5 removed the dead no-arg `LigRotamerDetector::generateRotamers()` (N=5, no
+aligned-bond filter) and the three unused `FlexibleLSalign` constructors, so
+only the six-argument constructor and the with-arg `generateRotamers(RigidLSalign*)`
+(N=3) remain.  Consequence: the `> 5000` deterministic-decimation branch in
+`generateRotamers(RigidLSalign*)` is **currently unreachable** from any public
+caller (11^3 = 1331 max).  `unit/test_rotamer.cpp` keeps `x1_deterministic_decimation`,
+which locks the public path's reproducibility and exercises the decimation
+arithmetic through a test-only extended angle set (20 angles -> 8000 records);
+it does not claim the branch is reachable in production.  `NRS_LEGACY_UNPARAM_BOND_NUM`
+(=5) is retained only because the sampler tests still pass it explicitly.
