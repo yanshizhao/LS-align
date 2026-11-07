@@ -167,7 +167,10 @@ TEST(f4_empty_ali_returns_empty_aligninfo) {
 TEST(f4_select_rotamers_empty_init_returns_empty) {
     Ligands q("fixtures/octane.mol2", false);
     Ligands t("fixtures/self.mol2", false);
-    Ligands ua("fixtures/unrelatedA.mol2", false);
+    /* R1 changed the 4th seed, so unrelatedA x unrelatedB at d0=0.1 now keeps
+     * one final pair.  tiny x unrelatedB still has none (both pre- and
+     * post-R1), which is what this case needs. */
+    Ligands ua("fixtures/tiny.mol2", false);
     Ligands ub("fixtures/unrelatedB.mol2", false);
 
     FlexibleLSalign f(q[0], t[0], 2.0, false, false, false);
@@ -321,10 +324,10 @@ TEST(f2_three_special_points_no_nan) {
  * once.  Poisoning alisco/sco gives a deterministic observable: a re-parse
  * overwrites both with its own values. */
 TEST(p2_zero_pair_parses_once) {
-    Ligands a("fixtures/unrelatedA.mol2", false);
+    Ligands a("fixtures/tiny.mol2", false);
     Ligands b("fixtures/unrelatedB.mol2", false);
     RigidLSalign ali(a[0], b[0], 0.1);
-    /* unrelatedA/B with d0=0.1: EGS finds pairs, but none within d0 */
+    /* tiny/unrelatedB with d0=0.1: EGS finds pairs, but none within d0 */
     CHECK(ali.m_isFinalParsed);
     CHECK(ali.finalAlignedPair.empty());
     CHECK(ali.finalAlignedPairDist.empty());
@@ -362,7 +365,7 @@ TEST(p2_zero_pair_parses_once) {
 /* P2: copying a settled object must copy the flag, otherwise the copy
  * re-parses an already-settled (possibly empty) result on first use. */
 TEST(p2_copy_preserves_flag) {
-    Ligands a("fixtures/unrelatedA.mol2", false);
+    Ligands a("fixtures/tiny.mol2", false);
     Ligands b("fixtures/unrelatedB.mol2", false);
     RigidLSalign ali(a[0], b[0], 0.1);
     CHECK(ali.m_isFinalParsed);
@@ -406,7 +409,7 @@ TEST(f9_detail_step_copied) {
  * with a NULL p_AliInfo, and every score accessor on it must return a safe
  * value instead of crashing. */
 TEST(f3_copy_null_safe) {
-    Ligands a("fixtures/unrelatedA.mol2", false);
+    Ligands a("fixtures/tiny.mol2", false);
     Ligands b("fixtures/unrelatedB.mol2", false);
     RigidLSalign src(a[0], b[0], 0.1);
     CHECK(src.p_AliInfo != NULL);
@@ -544,4 +547,175 @@ TEST(r8_zero_bond_coverage_is_one) {
     CHECK_CLOSE(ali.junBondInfoScoMtx[0][0], 1.0, 1e-12);
     /* the report matrix has its own zero guard and stays 0.0 there */
     CHECK_CLOSE(ali.junBondInfoScoMtx_for_final_sco[0][0], 0.0, 1e-12);
+}
+
+/* ---- R1: the 4th initial seed block must use junBondInfoScoMtx ---------- *
+ * The block used to receive bondInfoScoMtx, the very same matrix as block 3.
+ * Both runs are deterministic and the tie test is a strict '<', so the 4th
+ * block could never win: it was dead code, and the only ring-aware seed was
+ * never used.  The cases below reconstruct align()'s tournament for the last
+ * block twice (jun = fixed, bond = pre-fix) and pin the public result. */
+
+struct r1SeedRun {
+    AlignInfo* ali;
+    double u[3][3];
+    double t[3];
+};
+
+/* Runs one seed block exactly as align() does: EGS init, then
+ * nonsequentialIterAlign(..., rough_sliding_step, 3, ..., false, 10). */
+static r1SeedRun r1RunSeed(RigidLSalign& r, const vector<vector<double> >& mtx) {
+    r1SeedRun run;
+    EnhancedGS egs(mtx);
+    AlignInfo* p_init = egs.getPAliInfo();      /* owned by egs */
+    p_init->sco = 0.0;
+
+    double* t = new double[3];
+    run.ali = r.nonsequentialIterAlign(p_init, r.rough_sliding_step, 3, true, run.u, t, false, 10);
+    for (int h = 0; h < 3; ++h) {
+        run.t[h] = t[h];
+    }
+    delete[] t;
+    return run;
+}
+
+/* Replays align()'s seed tournament + detail refinement with `fourth` as the
+ * 4th block, on `scratch` (a RigidLSalign used only as a result container),
+ * and returns getLSscore8QuerySize(). */
+static double r1ReplayWithFourth(RigidLSalign& scratch, RigidLSalign& src,
+                                 const vector<vector<double> >& fourth) {
+    const vector<vector<double> >* mtxs[4];
+    mtxs[0] = &src.massDiffScoMtx;
+    mtxs[1] = &src.vdwRDiffScoMtx;
+    mtxs[2] = &src.bondInfoScoMtx;
+    mtxs[3] = &fourth;
+
+    double bestSco = -999999.0;
+    r1SeedRun best;
+    best.ali = NULL;
+    for (int b = 0; b < 4; ++b) {
+        r1SeedRun run = r1RunSeed(src, *mtxs[b]);
+        if (bestSco < run.ali->sco) {
+            bestSco = run.ali->sco;
+            if (NULL != best.ali) {
+                delete best.ali;
+                best.ali = NULL;
+            }
+            best = run;
+        } else {
+            delete run.ali;
+            run.ali = NULL;
+        }
+    }
+
+    if (NULL != scratch.p_AliInfo) {
+        delete scratch.p_AliInfo;
+        scratch.p_AliInfo = NULL;
+    }
+    double u[3][3];
+    double t[3];
+    int h = 0, d = 0;
+    for (h = 0; h < 3; ++h) {
+        t[h] = best.t[h];
+        for (d = 0; d < 3; ++d) {
+            u[h][d] = best.u[h][d];
+        }
+    }
+    scratch.p_AliInfo = src.nonsequentialIterAlign(best.ali, src.detail_sliding_step, 6, true, u, t, true, 1);
+    for (h = 0; h < 3; ++h) {
+        scratch.transVec[h] = t[h];
+        for (d = 0; d < 3; ++d) {
+            scratch.rotMtx[h][d] = u[h][d];
+        }
+    }
+    scratch.m_isFinalParsed = false;
+    scratch.finalAlignedPair.clear();
+    scratch.finalAlignedPairDist.clear();
+    scratch.parseFinalAliInfo();
+
+    delete best.ali;
+    best.ali = NULL;
+    return scratch.getLSscore8QuerySize();
+}
+
+/* ZINC03814177 vs the ACE template: the two matrices are numerically far
+ * apart, jun's seed score strictly beats all three other blocks, and the
+ * detail-refined result differs from the pre-fix (bond in block 4) result. */
+TEST(r1_fourth_seed_uses_jun_matrix) {
+    Ligands q("../example/ace_ligands.mol2", false);
+    Ligands t("../example/xtal-lig.mol2", false);
+    int idx = -1;
+    for (int i = 0; i < (int)q.size(); ++i) {
+        if (q[i].getLigname() == "ZINC03814177") { idx = i; break; }
+    }
+    CHECK(idx >= 0);
+    if (idx < 0) return;
+
+    RigidLSalign ali(q[idx], t[0], 2.0);
+    RigidLSalign scratch(q[idx], t[0], 2.0);
+
+    /* the two matrices really are different, so feeding the same one twice is
+     * observable (measured: jun [0][0]=0.0010, bond [0][0]=0.4964) */
+    CHECK(ali.junBondInfoScoMtx[0][0] != ali.bondInfoScoMtx[0][0]);
+    CHECK(ali.junBondInfoScoMtx[0][0] < 0.01);
+    CHECK(ali.bondInfoScoMtx[0][0] > 0.4);
+
+    /* measured seed scores: mass 9.580804, vdW 9.599709, bond 9.989799,
+     * jun 10.099036.  jun is the strict winner, so block 4 is selected. */
+    r1SeedRun runMass = r1RunSeed(ali, ali.massDiffScoMtx);
+    r1SeedRun runVdwr = r1RunSeed(ali, ali.vdwRDiffScoMtx);
+    r1SeedRun runBond = r1RunSeed(ali, ali.bondInfoScoMtx);
+    r1SeedRun runJun  = r1RunSeed(ali, ali.junBondInfoScoMtx);
+    CHECK_CLOSE(runMass.ali->sco, 9.580804, 1e-5);
+    CHECK_CLOSE(runVdwr.ali->sco, 9.599709, 1e-5);
+    CHECK_CLOSE(runBond.ali->sco, 9.989799, 1e-5);
+    CHECK_CLOSE(runJun.ali->sco, 10.099036, 1e-5);
+    CHECK(runJun.ali->sco > runMass.ali->sco);
+    CHECK(runJun.ali->sco > runVdwr.ali->sco);
+    CHECK(runJun.ali->sco > runBond.ali->sco);
+    delete runMass.ali; delete runVdwr.ali; delete runBond.ali; delete runJun.ali;
+
+    /* behaviour: the shipped align() result must equal the tournament whose
+     * 4th block is junBondInfoScoMtx, and must differ from the pre-fix
+     * tournament whose 4th block was bondInfoScoMtx.  If :671 regresses to
+     * bondInfoScoMtx the first CHECK fails (measured 0.642652 vs 0.677101);
+     * if the 4th block is dead code the second CHECK fails. */
+    double withJun  = r1ReplayWithFourth(scratch, ali, ali.junBondInfoScoMtx);
+    double withBond = r1ReplayWithFourth(scratch, ali, ali.bondInfoScoMtx);
+
+    CHECK_CLOSE(ali.getLSscore8QuerySize(), 0.677100953007, 1e-9);
+    CHECK_CLOSE(withJun, 0.677100953007, 1e-9);
+    CHECK_CLOSE(withBond, 0.642652394918, 1e-9);
+    CHECK_CLOSE(ali.getLSscore8QuerySize(), withJun, 1e-12);
+    CHECK(std::fabs(ali.getLSscore8QuerySize() - withBond) > 1e-3);
+}
+
+/* ZINC03814164 with the default d0 the CLI would pick: Nmin = 17, so
+ * d0 = 0.55*(17-9)^(1/3) + 0.15 = 1.25 exactly.  With the fixed code the
+ * final score is 0.5837018; the pre-fix block-4 matrix lands on
+ * 0.5732641.  This pins the default-d0 path the CLI actually uses. */
+TEST(r1_fourth_seed_differs_from_bond_on_ace) {
+    Ligands q("../example/ace_ligands.mol2", false);
+    Ligands t("../example/xtal-lig.mol2", false);
+    int idx = -1;
+    for (int i = 0; i < (int)q.size(); ++i) {
+        if (q[i].getLigname() == "ZINC03814164") { idx = i; break; }
+    }
+    CHECK(idx >= 0);
+    if (idx < 0) return;
+
+    int nMin = (int)q[idx].size() < (int)t[0].size() ? (int)q[idx].size() : (int)t[0].size();
+    double d0 = 0.55 * std::pow(nMin - 9.0, 1.0 / 3.0) + 0.15;
+    CHECK_CLOSE(d0, 1.25, 1e-12);
+
+    RigidLSalign ali(q[idx], t[0], d0);
+    RigidLSalign scratch(q[idx], t[0], d0);
+
+    double withJun  = r1ReplayWithFourth(scratch, ali, ali.junBondInfoScoMtx);
+    double withBond = r1ReplayWithFourth(scratch, ali, ali.bondInfoScoMtx);
+    CHECK_CLOSE(ali.getLSscore8QuerySize(), withJun, 1e-12);
+    /* measured: 0.5837018 (jun, shipped) vs 0.5732641 (pre-fix) */
+    CHECK_CLOSE(ali.getLSscore8QuerySize(), 0.583701782296, 1e-9);
+    CHECK_CLOSE(withBond, 0.573264100151, 1e-9);
+    CHECK(std::fabs(ali.getLSscore8QuerySize() - withBond) > 1e-3);
 }

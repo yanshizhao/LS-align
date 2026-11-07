@@ -668,7 +668,7 @@ private:
 			// using rough sliding_step (5) to search a jun's definition bond information matrix
 			// to obatin the initial alignment.
 			// ===================================================================
-			EnhancedGS junhBiInitEgs(bondInfoScoMtx);
+			EnhancedGS junhBiInitEgs(junBondInfoScoMtx);
 			AlignInfo* p_junBiInitAli = junhBiInitEgs.getPAliInfo();
 			p_junBiInitAli->sco = 0.0;			
 

@@ -101,8 +101,11 @@ if printf '%s' "${diag_out}" | grep -q "scoMtx\["; then
 else
     ok "stdout is free of scoMtx diagnostics"
 fi
+# Count is measured, not contractual: it changes when the initial seeds change
+# (R1: the junBond 4th seed turns 8 into 4 here).  The contract is only that
+# these diagnostics land on stderr, never on stdout.
 NDIAG="$(printf '%s\n' "${diag_err}" | grep -c "has a problem")"
-assert_eq "stderr carries 8 'has a problem' lines" "${NDIAG}" "8"
+assert_eq "stderr carries 4 'has a problem' lines" "${NDIAG}" "4"
 # The table must still be well-formed: blank, 2 header lines, 1 data row, blank, 3 timing lines.
 BODY_ROWS="$(printf '%s\n' "${diag_out}" | awk 'NF {n++} END{print n+0}')"
 assert_eq "stdout has 6 non-blank lines (2 header + 1 row + 3 timing)" "${BODY_ROWS}" "6"

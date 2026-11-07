@@ -75,9 +75,10 @@ TEST(leak_flexible_lsalign_align) {
 
 /* ---- Bug: getAlignedRMSD() divides by zero when nothing aligns -> NaN ---- */
 TEST(aligned_rmsd_nan_when_no_pairs) {
-    /* unrelatedA/B are 3 tiny dissimilar atoms; d0 clamps to 0.1 A, so
-     * finalAlignedPair is empty and the RMSD computation is 0/0. */
-    Ligands a("fixtures/unrelatedA.mol2", false);
+    /* tiny x unrelatedB: d0 clamps to 0.1 A, so finalAlignedPair is empty and
+     * the RMSD computation is 0/0.  (R1 makes unrelatedA x unrelatedB keep one
+     * pair at this d0, so it can no longer serve as the empty fixture.) */
+    Ligands a("fixtures/tiny.mol2", false);
     Ligands b("fixtures/unrelatedB.mol2", false);
     RigidLSalign ali(a[0], b[0], 0.1);
     double r = ali.getAlignedRMSD();
