@@ -320,3 +320,73 @@ TEST(b33_partition_refuses_incomplete_cover) {
     }
     CHECK(rd.generateRotamers().empty());
 }
+
+/* ================= X1 (deterministic decimation above 5000) ================= */
+
+static bool x1SameRotamerSets(const std::vector<Ligand>& a, const std::vector<Ligand>& b) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (a[i].size() != b[i].size()) return false;
+        for (int k = 0; k < a[i].size(); ++k) {
+            Point3D pa = a[i].getIthPoints(k);
+            Point3D pb = b[i].getIthPoints(k);
+            if (pa[0] != pb[0] || pa[1] != pb[1] || pa[2] != pb[2]) return false;
+        }
+    }
+    return true;
+}
+
+/* X1: an 11-atom chain plus detail angles (11) with the legacy 5-bond sampler
+ * leaves 4 useful bonds (both chain-end bonds have < 4 atoms on one side), so
+ * all_rotamer_num = 11^4 = 14641 > 5000 and the decimation branch runs.
+ * The old srand(clock())+rand() subset differed between runs; the decimated
+ * subset must be reproducible.  Measured on this fixture: the 5000 iterated
+ * records yield 791 non-overlapping conformers (the rest are rejected by
+ * judgeIsOverlapAtomsInLig). */
+TEST(x1_deterministic_decimation) {
+    Ligands ligs("fixtures/chain_c13.mol2", false);
+    std::vector<Ligand> all = ligs.getLigands();
+    Ligand src = all[0];
+    CHECK(src.size() == 13);
+
+    std::vector<Point3D> pts;
+    std::vector<std::string> types;
+    for (int i = 0; i < 11; ++i) {
+        pts.push_back(src.getIthPoints(i));
+        types.push_back(src.getAtomType(i));
+    }
+    std::vector<BondInfo> allBonds = src.getBondInfoes();
+    std::vector<BondInfo> bonds;
+    for (std::size_t i = 0; i < allBonds.size() && (int)i < 10; ++i)
+        bonds.push_back(allBonds[i]);
+    Ligand L("C11CHAIN", pts, types, bonds);
+    CHECK(L.size() == 11);
+
+    /* the branch really is reached: 11^4 > 5000 (the sampler clamps N to the
+     * number of useful bonds, which is 4 for this 11-atom chain) */
+    {
+        LigRotamerDetector probe(L, true, true);
+        CHECK(probe.rotAngles.size() == 11);
+        CHECK(probe.isWantedSaveTimeUsingRandomSelect);
+        std::vector<BondInfo> sb = probe.findAllSingleBond();
+        CHECK(sb.size() == 10);
+        std::vector<std::vector<std::vector<int> > > twoParts =
+            probe.getUsefulBondTwoPartIndsInfo(&sb);
+        CHECK(twoParts.size() == 4);        /* both end bonds are too short */
+        CHECK(probe.select_N_RotableSingleBondOnUniformDistribution(
+                  twoParts, sb, NRS_LEGACY_UNPARAM_BOND_NUM).size() == 4);
+    }
+
+    LigRotamerDetector rd1(L, true, true);
+    std::vector<Ligand> r1 = rd1.generateRotamers();
+    LigRotamerDetector rd2(L, true, true);
+    std::vector<Ligand> r2 = rd2.generateRotamers();
+    LigRotamerDetector rd3(L, true, true);
+    std::vector<Ligand> r3 = rd3.generateRotamers();
+
+    CHECK(!r1.empty());
+    CHECK(x1SameRotamerSets(r1, r2));
+    CHECK(x1SameRotamerSets(r1, r3));
+    CHECK(r1.size() == 791);            /* measured, not estimated */
+    CHECK(r1.size() <= 5000);           /* decimation cap holds */
+}

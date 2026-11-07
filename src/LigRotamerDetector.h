@@ -5,7 +5,6 @@
 #include "basic_fun.h"
 #include "Ligands.h"
 #include <vector>
-#include "time.h"
 using namespace std;
 
 #define DOUBLE_PI 6.283185307179586	// 2 * 3.141592653589793
@@ -22,7 +21,7 @@ private:
 	
 	// tmp
 	double** origLigDisMtx;		
-	bool isWantedSaveTimeUsingRandomSelect;	// �ж��Ƿ���Ҫ�� ��rotamer number > 5000��ʱ�����ѡ��5000���� ���ڼ���ʱ�䡣
+	bool isWantedSaveTimeUsingRandomSelect;	// true: cap rotamer sets > 5000 by deterministic decimation (X1)
 
 	// const final 
 	vector<double> rotAngles;
@@ -173,13 +172,8 @@ public:
 		int all_rotamer_num = (int)pow(rotAngles.size(), selectNIndsOfSignleBonds.size());
 
 		int max_iter_num = all_rotamer_num;
-		bool* rand_select_tags = NULL;
 		if (isWantedSaveTimeUsingRandomSelect && all_rotamer_num > 5000){
 			max_iter_num = 5000;
-
-			rand_select_tags = new bool[all_rotamer_num];
-			for (int j = 0; j < all_rotamer_num; j++)
-				rand_select_tags[j] = false;
 		}
 
 		int* mod_ref_arr = new int[selectNIndsOfSignleBonds.size()];
@@ -187,23 +181,14 @@ public:
 			mod_ref_arr[i] = (int)pow(rotAngles.size(), (int)selectNIndsOfSignleBonds.size()-1-i);
 		}
 
-		// cout << all_rotamer_num << "\t" << rotAngles.size() << "\t" << max_iter_num << "\t" << isWantedSaveTimeUsingRandomSelect << endl;
-
-		srand(clock());
 		for (int iter = 1; iter < max_iter_num; iter++){			// the rotamer set does not include itself.
 			int i = 0;
 			
 			int recordNum = iter;
 			if (isWantedSaveTimeUsingRandomSelect && all_rotamer_num > 5000){
-				int rdInd = rand();
-				recordNum = rdInd % all_rotamer_num;
-
-				if (rand_select_tags[recordNum]){
-					iter--;		// ensure we select 5000
-					continue;
-				}else{
-					rand_select_tags[recordNum] = true;
-				}
+				// X1: deterministic decimation (evenly spaced, reproducible)
+				recordNum = (int)((double)iter * all_rotamer_num / max_iter_num);
+				if (recordNum >= all_rotamer_num) recordNum = all_rotamer_num - 1;
 			}
 
 			double* angles = new double[selectNIndsOfSignleBonds.size()];
@@ -238,11 +223,6 @@ public:
 			angles = NULL;
 		}		
 
-		if (NULL != rand_select_tags){
-			delete[] rand_select_tags;
-			rand_select_tags = NULL;
-		}
-		
 		delete[] mod_ref_arr;
 		mod_ref_arr = NULL;
 		return ans;
@@ -309,13 +289,8 @@ public:
 		int all_rotamer_num = (int)pow(rotAngles.size(), selectNIndsOfSignleBonds.size());
 
 		int max_iter_num = all_rotamer_num;
-		bool* rand_select_tags = NULL;
 		if (isWantedSaveTimeUsingRandomSelect && all_rotamer_num > 5000){
 			max_iter_num = 5000;
-
-			rand_select_tags = new bool[all_rotamer_num];
-			for (int j = 0; j < all_rotamer_num; j++)
-				rand_select_tags[j] = false;
 		}
 
 		int* mod_ref_arr = new int[selectNIndsOfSignleBonds.size()];
@@ -323,23 +298,14 @@ public:
 			mod_ref_arr[i] = (int)pow(rotAngles.size(), (int)selectNIndsOfSignleBonds.size()-1-i);
 		}
 
-		// cout << all_rotamer_num << "\t" << rotAngles.size() << "\t" << max_iter_num << "\t" << isWantedSaveTimeUsingRandomSelect << endl;
-
-		srand(clock());
 		for (int iter = 1; iter < max_iter_num; iter++){			// the rotamer set does not include itself.
 			int i = 0;
 			
 			int recordNum = iter;
 			if (isWantedSaveTimeUsingRandomSelect && all_rotamer_num > 5000){
-				int rdInd = rand();
-				recordNum = rdInd % all_rotamer_num;
-
-				if (rand_select_tags[recordNum]){
-					iter--;		// ensure we select 5000
-					continue;
-				}else{
-					rand_select_tags[recordNum] = true;
-				}
+				// X1: deterministic decimation (evenly spaced, reproducible)
+				recordNum = (int)((double)iter * all_rotamer_num / max_iter_num);
+				if (recordNum >= all_rotamer_num) recordNum = all_rotamer_num - 1;
 			}
 
 			double* angles = new double[selectNIndsOfSignleBonds.size()];
@@ -374,11 +340,6 @@ public:
 			angles = NULL;
 		}		
 
-		if (NULL != rand_select_tags){
-			delete[] rand_select_tags;
-			rand_select_tags = NULL;
-		}
-		
 		delete[] mod_ref_arr;
 		mod_ref_arr = NULL;
 		return ans;
