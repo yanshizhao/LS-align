@@ -631,6 +631,32 @@ TEST(x1_deterministic_decimation) {
     }
 }
 
+TEST(r30_sampler_rejects_short_two_parts_table) {
+    /* Guard at LigRotamerDetector.h:298-302: the two-parts table must have at
+     * least as many entries as singleBonds, each with two atom sides.
+     * NOTE: the sibling guard `samllPartAtomNums.size() < 2` (:315-319) is
+     * unreachable -- N is clamped to 3 and the early return handles
+     * singleBonds.size() <= N, so size() is always >= 4 there.  It is kept as
+     * defence in depth and is NOT covered here. */
+    Ligands ligs("fixtures/octane.mol2", false);
+    Ligand L = ligs[0];
+    LigRotamerDetector rd(L);
+
+    std::vector<BondInfo> sb = rd.findAllSingleBond();
+    CHECK(sb.size() == 7);
+
+    /* four bonds, but only one entry in the two-parts table */
+    std::vector<BondInfo> four(sb.begin(), sb.begin() + 4);
+    std::vector<std::vector<std::vector<int> > > shortTable(1);
+    shortTable[0].resize(2);
+    shortTable[0][0].push_back(0);
+    shortTable[0][1].push_back(1);
+
+    std::vector<int> r =
+        rd.select_N_RotableSingleBondOnUniformDistribution(shortTable, four, 3);
+    CHECK(r.empty());                 /* RED if guard 1 is removed (OOB read) */
+}
+
 /* ================= R9 (overlap criterion) ================= */
 
 /* R9: bondHops is a BFS hop table over the bond graph, built once per

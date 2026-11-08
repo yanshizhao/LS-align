@@ -319,7 +319,7 @@ int main(int argc, char* args[]){
 	bool isSaveRotMtx = false;
 	string saveRotMtxPath;
 
-	bool isNeedMoreCorrectAlign = false; // TODO
+	bool isNeedMoreCorrectAlign = false;
 
 	bool isLoad_H = false;
 

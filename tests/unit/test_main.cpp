@@ -17,6 +17,8 @@
 #include "test_kabsch.cpp"
 #include "test_evaluation.cpp"
 #include "test_enhancedgs.cpp"
+/* Must precede test_ligands: it pulls Ligands.h in under "private public". */
+#include "test_ligands_private.cpp"
 #include "test_ligands.cpp"
 /* Must precede test_rigid/test_rotamer/test_xfail: it pulls RigidLSalign.h,
  * LigRotamerDetector.h and FlexibleLSalign.h in under "private public". */
