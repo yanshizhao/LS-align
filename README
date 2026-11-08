@@ -164,9 +164,10 @@ We thank that Dr.John Kulp helps us to fix the compiled error about the "abs" fu
    kept (the sampler is shared) but a build can only reach it by extending the
    angle set.
 4. `-rf 2` (Fragment mode) is not implemented in this build; it is rejected.
-5. Strict input format: only fixed-column mol2 is accepted.  PDB/CIF/SDF are
-   not supported, and mol2 files with non-standard column widths may be
-   rejected or misparsed.
+5. Input format: mol2 only (PDB/CIF/SDF are not supported).  ATOM records are
+   parsed fixed-column first, falling back to whitespace/Tab tokenisation when
+   the fixed columns are not parseable; malformed records are rejected with a
+   diagnostic.
 6. The score is a weighted heuristic (distance, mass and bond-environment
    terms) normalised by ligand size; it is not the PC-score of the paper, and
    the reported `RMSD_lb` is the Vina lower bound, not the aligned RMSD.
