@@ -67,6 +67,12 @@ reject_case "-H 0.5"   "${QFIX}" "${TFIX}" -H 0.5
 reject_case "-d0 abc"  "${QFIX}" "${TFIX}" -d0 abc
 reject_case "-d0 0.05" "${QFIX}" "${TFIX}" -d0 0.05
 reject_case "-d0 9"    "${QFIX}" "${TFIX}" -d0 9
+# NaN literals are accepted by strtod but must be rejected: the range test
+# (v < lo || v > hi) is false for NaN, so it would slip through.
+reject_case "-d0 nan"    "${QFIX}" "${TFIX}" -d0 nan
+reject_case "-d0 NaN"    "${QFIX}" "${TFIX}" -d0 NaN
+reject_case "-d0 -nan"   "${QFIX}" "${TFIX}" -d0 -nan
+reject_case "-d0 nan(0)" "${QFIX}" "${TFIX}" -d0 "nan(0)"
 
 echo "== CLI: invalid / out-of-range -oq and -ot =="
 reject_case "-oq 0"    "${QFIX}" "${TFIX}" -oq 0

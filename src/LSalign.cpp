@@ -271,6 +271,11 @@ static bool parseDoubleArg(const char* optName, const char* val, double lo, doub
 		     << " (expected a number)." << endl;
 		return false;
 	}
+	if (v != v){    // NaN compares false against everything, including itself
+		cerr << "LSalign: ERROR: " << optName << " value \"" << val
+		     << "\" is not a finite number." << endl;
+		return false;
+	}
 	if (v < lo || v > hi){
 		cerr << "LSalign: ERROR: " << optName << " value " << v
 		     << " out of range [" << lo << ", " << hi << "]." << endl;
