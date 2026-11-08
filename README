@@ -182,10 +182,11 @@ We thank that Dr.John Kulp helps us to fix the compiled error about the "abs" fu
   on top of the six MOL2 base types when a bond belongs to a ring, so
   `junBondInfoScoMtx` sees extra ring-context keys.  This is scoring only:
   ring bonds are never rotated.
-* Initial seeds (R2).  `align()` starts the search from four seed matrices,
-  none of which is one of the three seeds of the paper's Eq.(7):
-  1. mass difference;
-  2. vdW-radius difference;
+* Initial seeds (R2).  `align()` starts the search from four seed matrices.
+  Seeds 1 and 2 have the form of `S_mass` and `S_vdw` in the paper's Eq.(7);
+  seed 3 is meant to be `S_bond`, and seed 4 is an extension:
+  1. mass difference -- `1/(1+(dm/dm0)^2)`, i.e. Eq.(7)'s `S_mass`;
+  2. vdW-radius difference -- `1/(1+(dvdw/vdw0)^2)`, i.e. Eq.(7)'s `S_vdw`;
   3. `bondInfoScoMtx` -- bond-length-weighted coordination-number matching with
      a weak bond-type preference (a matching bond type gets a small boost, a
      mismatched one is not penalised).  This is NOT the paper's BWJS (Eq.(4)):
@@ -194,7 +195,8 @@ We thank that Dr.John Kulp helps us to fix the compiled error about the "abs" fu
      types (3.0 > 2.4), i.e. coordination number dominates;
   4. `junBondInfoScoMtx` -- bond type with ring context (see X2 above), also an
      extension beyond the paper.
-  All four are heuristic scoring seeds, not the paper's three seeds.
+  Seed 3 is not the paper's BWJS, and seed 4 has no counterpart in the paper:
+  no seed uses BWJS as `S_bond`.  All four are heuristic scoring seeds.
 * Detail angle set (X3).  `-md 1` appends +-180, +-90 and +-30 degrees to the
   default 5-angle set (0, +-60, +-120), i.e. 11 discrete angles per bond.
 * Candidate selection (X4).  `FlexibleLSalign::selectRotamers` keeps up to 10
