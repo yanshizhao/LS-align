@@ -2,6 +2,7 @@
 #include "leak_probe.h"
 #include "Ligands.h"
 #include <float.h>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -422,6 +423,114 @@ TEST(f15_index_oob_guard) {
     CHECK(L.getBondInfoes().size() == 1);
     /* the out-of-range bond keeps its previous length; nothing was read */
     CHECK_CLOSE(L.getBondInfoes()[0].bondDis, 1.5, 0.0);
+}
+
+/* ---- T-041: bond indexes that fall outside bondInfoes' atom range (or a
+ * self-loop) must be skipped by the three cache getters.  "Skipped" means the
+ * bond is treated as absent: btMtx stays NOTCONNECTED, bondDisMtx stays -1.0,
+ * and the bond is never fed to Dijkstra.  Before the fix the matrices were
+ * written out of range (heap corruption / SIGSEGV). */
+static Ligand makeTwoAtomOneBondLigand() {
+    std::vector<Point3D> pts;
+    pts.push_back(Point3D(0.0, 0.0, 0.0));
+    pts.push_back(Point3D(1.5, 0.0, 0.0));
+    std::vector<std::string> types;
+    types.push_back("C");
+    types.push_back("C");
+    std::vector<BondInfo> bonds;
+    BondInfo b;
+    b.aInd = 0;
+    b.bInd = 1;
+    b.bt = SINGLE;
+    b.bondDisPow2 = 2.25;
+    b.bondDis = 1.5;
+    bonds.push_back(b);
+    return Ligand("OOB", pts, types, bonds);
+}
+
+static Ligand shrinkToOneAtom(Ligand L) {
+    std::vector<Point3D> one;
+    one.push_back(Point3D(5.0, 5.0, 5.0));
+    L.setPoints(one);
+    return L;
+}
+
+static int countOccurrences(const std::string& hay, const std::string& needle) {
+    int n = 0;
+    std::string::size_type pos = 0;
+    while ((pos = hay.find(needle, pos)) != std::string::npos) {
+        n++;
+        pos += needle.size();
+    }
+    return n;
+}
+
+TEST(bond_index_oob_skipped_type_matrix) {
+    Ligand L = shrinkToOneAtom(makeTwoAtomOneBondLigand());
+    CHECK(L.size() == 1);
+    CHECK(L.getBondInfoes().size() == 1);
+    BondType** mtx = L.getBondTypeMtx();
+    CHECK(mtx != NULL);
+    CHECK(mtx[0][0] == NOTCONNECTED);   /* the bad bond wrote nothing */
+}
+
+TEST(bond_index_oob_skipped_dist_matrix) {
+    Ligand L = shrinkToOneAtom(makeTwoAtomOneBondLigand());
+    double** mtx = L.getBondDistMtx();
+    CHECK(mtx != NULL);
+    CHECK(mtx[0][0] == -1.0);
+}
+
+TEST(bond_index_oob_skipped_atom_bond_types) {
+    Ligand L = shrinkToOneAtom(makeTwoAtomOneBondLigand());
+    const std::vector< std::vector<BondType> >& abt = L.getAtomBondTypes();
+    CHECK(abt.size() == 1);
+    CHECK(abt[0].empty());              /* no valid bond reaches atom 0 */
+}
+
+TEST(bond_self_loop_skipped) {
+    std::vector<Point3D> pts;
+    pts.push_back(Point3D(0.0, 0.0, 0.0));
+    pts.push_back(Point3D(1.5, 0.0, 0.0));
+    std::vector<std::string> types;
+    types.push_back("C");
+    types.push_back("C");
+    std::vector<BondInfo> bonds;
+    BondInfo b;
+    b.aInd = 0;
+    b.bInd = 0;
+    b.bt = SINGLE;
+    b.bondDisPow2 = 0.0;
+    b.bondDis = 0.0;
+    bonds.push_back(b);
+    Ligand L("LOOP", pts, types, bonds);
+
+    BondType** bt = L.getBondTypeMtx();
+    CHECK(bt[0][0] == NOTCONNECTED);
+    double** dis = L.getBondDistMtx();
+    CHECK(dis[0][0] == -1.0);
+    const std::vector< std::vector<BondType> >& abt = L.getAtomBondTypes();
+    CHECK(abt.size() == 2);
+    CHECK(abt[0].empty());
+    CHECK(abt[1].empty());
+}
+
+TEST(bond_bad_warning_once) {
+    Ligand L = shrinkToOneAtom(makeTwoAtomOneBondLigand());
+
+    std::ostringstream captured;
+    std::streambuf* oldBuf = std::cerr.rdbuf(captured.rdbuf());
+    L.getBondTypeMtx();                 /* first bad bond: one warning */
+    L.getBondDistMtx();                 /* same object: suppressed */
+    std::vector<Point3D> one;
+    one.push_back(Point3D(6.0, 6.0, 6.0));
+    L.setPoints(one);                   /* drops the caches, not the flag */
+    L.getBondTypeMtx();
+    L.getAtomBondTypes();
+    std::cerr.rdbuf(oldBuf);
+
+    std::string log = captured.str();
+    CHECK(countOccurrences(log, "the bond is ignored") == 1);
 }
 
 /* ---- T-021F1: format2PDB must survive extreme finite coordinates ----

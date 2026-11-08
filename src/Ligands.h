@@ -80,6 +80,7 @@ private:
 	vector<string> atomNames;			// original atom names, same index as points
 	vector<BondInfo> bondInfoes;		// the bond	information in the ligand, without Jun definition bond type
 	BondType** btMtx;					// record the i - j bond type
+	bool m_hasReportedBadBonds;	// suppress repeated warnings while caches are rebuilt
 	
 	double** bondDisMtx;				// not-connect is setted as -1
 public:
@@ -93,6 +94,7 @@ public:
 		
 		btMtx = NULL;
 		bondDisMtx = NULL;
+		m_hasReportedBadBonds = false;
 	}
 	
 	/************************************************	
@@ -135,6 +137,7 @@ public:
 			bondDisMtx = NULL;
 		}
 		
+		m_hasReportedBadBonds = lig.m_hasReportedBadBonds;
 	}	
 	
 	Ligand& operator=(const Ligand& lig){
@@ -168,10 +171,12 @@ public:
 			}
 		} else bondDisMtx = NULL;
 
+		m_hasReportedBadBonds = lig.m_hasReportedBadBonds;
+
 		return *this;
 	}
 	
-	Ligand(){ btMtx = NULL; bondDisMtx = NULL; }
+	Ligand(){ btMtx = NULL; bondDisMtx = NULL; m_hasReportedBadBonds = false; }
 	
 	~Ligand(){ resetCaches(); }
 	
@@ -187,17 +192,14 @@ public:
 				}
 			}
 			
-			for (i = 0; i < bondInfoes.size(); i++){
-				int aInd = bondInfoes[i].aInd;
-				int bInd = bondInfoes[i].bInd;
-				BondType bt = bondInfoes[i].bt;
-				
-				if (aInd == bInd){
-					cerr << "getBondTypeMtx says " << aInd << "\t=\t" << bInd << endl;
+			for (i = 0; i < (int)bondInfoes.size(); i++){
+				BondInfo& bi = bondInfoes[i];
+				if (!isBondIndexValid(bi)){
+					reportBadBondOnce(i, bi);
+					continue;                      // btMtx stays NOTCONNECTED
 				}
-				
-				btMtx[aInd][bInd] = bt;
-				btMtx[bInd][aInd] = bt;
+				btMtx[bi.aInd][bi.bInd] = bi.bt;
+				btMtx[bi.bInd][bi.aInd] = bi.bt;
 			}
 		}
 		
@@ -216,17 +218,14 @@ public:
 				}
 			}
 			
-			for (i = 0; i < bondInfoes.size(); i++){
-				int aInd = bondInfoes[i].aInd;
-				int bInd = bondInfoes[i].bInd;
-				double dist = bondInfoes[i].bondDis;
-				
-				if (aInd == bInd){
-					cerr << "getBondTypeMtx says " << aInd << "\t=\t" << bInd << endl;
+			for (i = 0; i < (int)bondInfoes.size(); i++){
+				BondInfo& bi = bondInfoes[i];
+				if (!isBondIndexValid(bi)){
+					reportBadBondOnce(i, bi);
+					continue;                      // bondDisMtx stays -1.0
 				}
-				
-				bondDisMtx[aInd][bInd] = dist;
-				bondDisMtx[bInd][aInd] = dist;
+				bondDisMtx[bi.aInd][bi.bInd] = bi.bondDis;
+				bondDisMtx[bi.bInd][bi.aInd] = bi.bondDis;
 			}
 		}
 		
@@ -306,8 +305,12 @@ public:
 			
 			vector< vector<int> > rings;
 			getBondDistMtx();
-			for (i = 0; i < bondInfoes.size(); i++){
+			for (i = 0; i < (int)bondInfoes.size(); i++){
 				BondInfo bi = bondInfoes[i];
+				if (!isBondIndexValid(bi)){
+					reportBadBondOnce(i, bi);
+					continue;                      // do not feed the bad bond to Dijkstra
+				}
 				DijkstraSRoad* dsr = new DijkstraSRoad(bondDisMtx, size());
 				vector<int> road = dsr->getRoad(bi.aInd, bi.bInd, true);
 
@@ -455,6 +458,23 @@ public:
 	}
 
 private:
+	bool isBondIndexValid(const BondInfo& bi) const {
+		int n = (int)points.size();
+		return bi.aInd >= 0 && bi.aInd < n
+			&& bi.bInd >= 0 && bi.bInd < n
+			&& bi.aInd != bi.bInd;
+	}
+
+	void reportBadBondOnce(int bondIndex, const BondInfo& bi){
+		if (m_hasReportedBadBonds)
+			return;
+		m_hasReportedBadBonds = true;
+		cerr << "LSalign: WARNING: ligand '" << ligname << "': bond " << bondIndex
+			<< " refers to atom " << (bi.aInd + 1) << "-" << (bi.bInd + 1)
+			<< " (self-loop or out of range), valid 1-" << (int)points.size()
+			<< "; the bond is ignored" << endl;
+	}
+
 	void resetCaches(){
 		if (NULL != btMtx){
 			for (int i = 0; i < (int)points.size(); i++) delete[] btMtx[i];
