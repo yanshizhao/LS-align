@@ -507,6 +507,9 @@ private:
 		if (NULL == p_AliInfo)
 			return;
 
+		finalAlignedPair.clear();		// re-entry must not accumulate
+		finalAlignedPairDist.clear();
+
 		alisco = 0.0;
 		int alinum = 0;
 

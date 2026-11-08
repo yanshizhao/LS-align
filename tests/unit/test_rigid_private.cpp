@@ -389,6 +389,34 @@ TEST(p2_copy_preserves_flag) {
     CHECK(copy.p_AliInfo->sco == -7.0);
 }
 
+/* P2: parseFinalAliInfo() fills finalAlignedPair/Dist by push_back.  It must be
+ * re-entrant-safe: calling it twice yields the same size, not double.  Before
+ * the fix a second call doubled both vectors (and the derived Jaccard ratio
+ * silently changed), which is exactly the "wrong numbers, no crash" failure. */
+TEST(p2_parse_final_ali_info_is_idempotent) {
+    Ligands ligs("fixtures/self.mol2", false);
+    RigidLSalign ali(ligs[0], ligs[0], 2.0);          /* align() parsed once */
+
+    const int n1 = (int)ali.finalAlignedPair.size();
+    const int d1 = (int)ali.finalAlignedPairDist.size();
+    const double jac1 = ali.getJaccardRatio();
+    const double rmsd1 = ali.getAlignedRMSD();
+    CHECK(n1 > 0);
+    CHECK(n1 == d1);
+
+    ali.parseFinalAliInfo();                          /* second */
+    CHECK((int)ali.finalAlignedPair.size() == n1);
+    CHECK((int)ali.finalAlignedPairDist.size() == d1);
+    CHECK_CLOSE(ali.getJaccardRatio(), jac1, 1e-12);
+    CHECK_CLOSE(ali.getAlignedRMSD(), rmsd1, 1e-12);
+
+    ali.parseFinalAliInfo();                          /* third */
+    CHECK((int)ali.finalAlignedPair.size() == n1);
+    CHECK((int)ali.finalAlignedPairDist.size() == d1);
+    CHECK_CLOSE(ali.getJaccardRatio(), jac1, 1e-12);
+    CHECK_CLOSE(ali.getAlignedRMSD(), rmsd1, 1e-12);
+}
+
 /* F9: the copy constructor used to copy rough_sliding_step but not
  * detail_sliding_step, leaving the copy with an uninitialised increment for
  * align()'s detail pass.  align() is not reachable on a copy today, so the
