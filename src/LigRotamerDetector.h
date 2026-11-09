@@ -694,6 +694,8 @@ private:
 		vector<BondInfo> bindInfo = lig.getBondInfoes();                                                                        
 		for (int i = 0; i < bindInfo.size(); i++){ // disconsider the first and last bond                                       
 			BondInfo ithBI = bindInfo[i];
+			if (!lig.isBondIndexValid(ithBI))
+				continue;                   // bad bond must not reach leftRightPartOnBond's allRoad[...]
 			
 			string aAtomType = lig.getAtomType(ithBI.aInd);
 			toUpperString(aAtomType); 
