@@ -499,6 +499,8 @@ private:
 		vector<BondInfo> bondAtomInfo = lig.getBondInfoes();                                                                       
 		for (int i = 0; i < bondAtomInfo.size(); i++){                                                                              
 			BondInfo ithBond = bondAtomInfo[i];                                                                               
+			if (!lig.isBondIndexValid(ithBond))
+				continue;                       // adjacencyMtx stays 0.0 == "no edge"
 			double ithBondDis = ithBond.bondDis;                                                                                          
 			                                                                                                                         
 			adjacencyMtx[ithBond.aInd][ithBond.bInd] = ithBondDis;                                                         
