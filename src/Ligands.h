@@ -84,8 +84,6 @@ private:
 	
 	double** bondDisMtx;				// not-connect is setted as -1
 public:
-	// the stored aInd/bInd is a parse-time snapshot; points can shrink later
-	// (setPoints keeps the bond row and only skips the length refresh).
 	bool isBondIndexValid(const BondInfo& bi) const {
 		int n = (int)points.size();
 		return bi.aInd >= 0 && bi.aInd < n
@@ -205,7 +203,7 @@ public:
 				BondInfo& bi = bondInfoes[i];
 				if (!isBondIndexValid(bi)){
 					reportBadBondOnce(i, bi);
-					continue;                      // btMtx stays NOTCONNECTED
+					continue;
 				}
 				btMtx[bi.aInd][bi.bInd] = bi.bt;
 				btMtx[bi.bInd][bi.aInd] = bi.bt;
@@ -231,7 +229,7 @@ public:
 				BondInfo& bi = bondInfoes[i];
 				if (!isBondIndexValid(bi)){
 					reportBadBondOnce(i, bi);
-					continue;                      // bondDisMtx stays -1.0
+					continue;
 				}
 				bondDisMtx[bi.aInd][bi.bInd] = bi.bondDis;
 				bondDisMtx[bi.bInd][bi.aInd] = bi.bondDis;
@@ -246,12 +244,12 @@ public:
 	}
 	
 	void setPoints(vector<Point3D> pts){
-		resetCaches();                       // F11: release caches sized by the old points
+		resetCaches();
 		vector<Point3D>().swap(this->points);
 		
 		this->points = pts;
 		const double bondDisEps = 1e-9;
-		for (int i = 0; i < (int)bondInfoes.size(); i++){   // F15: refresh, ignoring ulp drift
+		for (int i = 0; i < (int)bondInfoes.size(); i++){
 			int aInd = bondInfoes[i].aInd;
 			int bInd = bondInfoes[i].bInd;
 			if (aInd < 0 || aInd >= (int)points.size()
@@ -321,7 +319,7 @@ public:
 				BondInfo bi = bondInfoes[i];
 				if (!isBondIndexValid(bi)){
 					reportBadBondOnce(i, bi);
-					continue;                      // do not feed the bad bond to Dijkstra
+					continue;
 				}
 				DijkstraSRoad* dsr = new DijkstraSRoad(bondDisMtx, size());
 				vector<int> road = dsr->getRoad(bi.aInd, bi.bInd, true);
@@ -636,7 +634,7 @@ private:
 	}
 
 	static bool isFiniteCoord(double v){
-		return v == v && v <= 1e308 && v >= -1e308;    // rejects NaN and +-Inf
+		return v == v && v <= 1e308 && v >= -1e308;
 	}
 
 	static bool isPureNumber(const string& str){
@@ -738,7 +736,6 @@ private:
 			return true;
 		}
 
-		// Four fields (id x y z) carry no name/type; coordinates are usable.
 		if (4 == tokens.size()
 			&& isPureNumber(tokens[1]) && isPureNumber(tokens[2]) && isPureNumber(tokens[3])){
 			x = strtod(tokens[1].c_str(), NULL);
@@ -776,7 +773,6 @@ private:
 				break;
 			}
 			
-			// Empty strings separate sections; every other line is a record.
 			if (oneLigMol2Infos[l].empty()){
 				l++;
 				continue;
@@ -953,11 +949,11 @@ private:
 		vector<string> mol2Sb;
 		ifstream fin(filePath.c_str());
 		string line;
-		int lineNo = 1;			// 1-based file line number of `line`
-		int curBlockStartLine = 1;	// file line number of mol2Sb[0]
+		int lineNo = 1;
+		int curBlockStartLine = 1;
 		getline(fin, line);
 		while (fin.good()){
-			line = eraseAll(line, '\r');	// Since the differnece between windows (\r\n) and Linux (\n), so we should do this step.
+			line = eraseAll(line, '\r');
 			if (line.compare(0, 17, "@<TRIPOS>MOLECULE") == 0){
 				if (isFirst){
 					isFirst = false;
@@ -968,8 +964,6 @@ private:
 				}
 			}
 			
-			// mol2Sb[0] may precede the first MOLECULE (comment header); this
-			// keeps the index->file-line mapping exact for every block.
 			curBlockStartLine = lineNo - (int)mol2Sb.size();
 			
 			mol2Sb.push_back(line);
