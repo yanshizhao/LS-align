@@ -84,6 +84,15 @@ private:
 	
 	double** bondDisMtx;				// not-connect is setted as -1
 public:
+	// the stored aInd/bInd is a parse-time snapshot; points can shrink later
+	// (setPoints keeps the bond row and only skips the length refresh).
+	bool isBondIndexValid(const BondInfo& bi) const {
+		int n = (int)points.size();
+		return bi.aInd >= 0 && bi.aInd < n
+			&& bi.bInd >= 0 && bi.bInd < n
+			&& bi.aInd != bi.bInd;
+	}
+
 	Ligand(string ligname, vector<Point3D> points, vector<string> atomtypes, vector<BondInfo> bondInfoes,
 		vector<string> atomNames = vector<string>()){
 		this->ligname = ligname;
@@ -458,13 +467,6 @@ public:
 	}
 
 private:
-	bool isBondIndexValid(const BondInfo& bi) const {
-		int n = (int)points.size();
-		return bi.aInd >= 0 && bi.aInd < n
-			&& bi.bInd >= 0 && bi.bInd < n
-			&& bi.aInd != bi.bInd;
-	}
-
 	void reportBadBondOnce(int bondIndex, const BondInfo& bi){
 		if (m_hasReportedBadBonds)
 			return;
