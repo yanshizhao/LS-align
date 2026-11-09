@@ -280,6 +280,9 @@ public:
 	}
 	
 	string getAtomType(int ind){
+		if (ind < 0 || ind >= (int)atomtypes.size()){
+			return "";
+		}
 		return atomtypes[ind];
 	}
 	
