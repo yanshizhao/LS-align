@@ -25,6 +25,9 @@
 #include "test_rigid_private.cpp"
 #include "test_rigid.cpp"
 #include "test_rotamer.cpp"
+/* After test_rotamer.cpp: FragmentLSalign.h is first included here, outside the
+ * "private public" window above (its constructor is public). */
+#include "test_fragment.cpp"
 #include "test_oracle.cpp"
 #include "test_xfail.cpp"
 #include "test_delete_mismatch.cpp"

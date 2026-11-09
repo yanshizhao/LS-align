@@ -799,3 +799,107 @@ TEST(r9_dropped_condition_is_equivalent) {
     CHECK(mismatches == 0);
     CHECK(oldTrue > 0 && oldTrue < compares);
 }
+
+/* ================= T-044 (stale bondInfoes indexes) ================= */
+
+/* A ligand from in-memory atoms/bonds.  Staleness is produced by shrinking the
+ * point set: setPoints() warns and keeps the bond row unchanged (only the
+ * length refresh is skipped), so bondInfoes still points at the old indexes. */
+static Ligand t044MakeStaleBond(int nAtoms, int aInd, int bInd, int shrinkTo) {
+    std::vector<Point3D> pts;
+    std::vector<std::string> types;
+    for (int i = 0; i < nAtoms; ++i) {
+        pts.push_back(Point3D(i * 1.5, 0.0, 0.0));
+        types.push_back("C");
+    }
+    BondInfo b;
+    b.aInd = aInd; b.bInd = bInd; b.bt = SINGLE;
+    b.bondDis = 1.5; b.bondDisPow2 = 2.25;
+    std::vector<BondInfo> bonds; bonds.push_back(b);
+    Ligand L("T044", pts, types, bonds);
+    L.setPoints(std::vector<Point3D>(shrinkTo, Point3D(0.0, 0.0, 0.0)));
+    return L;
+}
+
+/* T-044 sub-step B: shortestRoadBetweenTwoAtoms() used to write the raw
+ * aInd/bInd of every bond row into a node_num x node_num matrix; a bond left
+ * over from before setPoints() shrank the ligand crashed there (measured
+ * SIGSEGV at LigRotamerDetector.h:505).  The stale bond must be skipped, the
+ * matrix stays 0.0 ("no edge"), so the two atoms are unreachable. */
+TEST(t044_rotamer_ctor_skips_stale_bond) {
+    Ligand L = t044MakeStaleBond(100, 0, 99, 2);   /* bondInfoes still {0,99} */
+    CHECK(L.size() == 2);
+    CHECK(L.getBondInfoes().size() == 1);
+
+    LigRotamerDetector rd(L);
+    CHECK(rd.p_sroad != NULL);
+    CHECK(rd.p_sroad->isValid());
+    CHECK(rd.p_sroad->getHopCount(0, 1) == -1);    /* no edge was written */
+    CHECK(rd.p_sroad->getHopCount(1, 0) == -1);
+}
+
+/* T-044 sub-step C: findAllSingleBond() must drop a stale bond before it is
+ * used.  With only the adjacency guard in place the stale row would still
+ * reach getUsefulBondTwoPartIndsInfo() -> leftRightPartOnBond()'s allRoad[],
+ * which is indexed by the raw bInd (measured SIGSEGV at :599 for bInd=10 on
+ * an 8-atom ligand). */
+TEST(t044_rotamer_find_single_bond_skips_stale) {
+    Ligand L = t044MakeStaleBond(100, 0, 99, 2);
+    LigRotamerDetector rd(L);
+    CHECK(rd.findAllSingleBond().empty());
+}
+
+/* T-044 sub-step E: atomtypes may be shorter than points (the public
+ * constructor accepts any two vectors).  getAtomType used to return
+ * atomtypes[ind] unchecked; a 3-atom / 1-type ligand then aborted with
+ * std::length_error (measured rc=127) inside findAllSingleBond. */
+TEST(t044_rotamer_type_oob_returns_empty) {
+    std::vector<Point3D> pts;
+    std::vector<std::string> types;
+    for (int i = 0; i < 3; ++i) pts.push_back(Point3D(i * 1.5, 0.0, 0.0));
+    types.push_back("C");
+    BondInfo b;
+    b.aInd = 0; b.bInd = 1; b.bt = SINGLE;
+    b.bondDis = 1.5; b.bondDisPow2 = 2.25;
+    std::vector<BondInfo> bonds; bonds.push_back(b);
+    Ligand L("T044T", pts, types, bonds);
+
+    CHECK(L.getAtomType(0) == "C");
+    CHECK(L.getAtomType(1) == "");
+    CHECK(L.getAtomType(2) == "");
+    CHECK(L.getAtomType(-1) == "");
+    CHECK(L.getAtomType((int)types.size()) == "");
+
+    /* the detector's type table read is safe too */
+    LigRotamerDetector rd(L);
+    CHECK(rd.findAllSingleBond().size() == 1);    /* {0,1}, both ends non-H */
+}
+
+/* T-044 control (no over-fixing): a valid bond must still be written.  With a
+ * good {0,1} and a stale {1,99} in the same ligand, the good edge survives
+ * (one hop) and the stale one contributes nothing. */
+TEST(t044_good_bond_still_written) {
+    std::vector<Point3D> pts;
+    std::vector<std::string> types;
+    for (int i = 0; i < 3; ++i) {
+        pts.push_back(Point3D(i * 1.5, 0.0, 0.0));
+        types.push_back("C");
+    }
+    BondInfo good;
+    good.aInd = 0; good.bInd = 1; good.bt = SINGLE;
+    good.bondDis = 1.5; good.bondDisPow2 = 2.25;
+    BondInfo bad;
+    bad.aInd = 1; bad.bInd = 99; bad.bt = SINGLE;
+    bad.bondDis = 1.5; bad.bondDisPow2 = 2.25;
+    std::vector<BondInfo> bonds;
+    bonds.push_back(good);
+    bonds.push_back(bad);
+    Ligand L("T044GB", pts, types, bonds);
+
+    LigRotamerDetector rd(L);
+    CHECK(rd.p_sroad->isValid());
+    CHECK(rd.p_sroad->getHopCount(0, 1) == 1);    /* the good edge is there */
+    CHECK(rd.p_sroad->getHopCount(1, 0) == 1);
+    CHECK(rd.p_sroad->getHopCount(1, 2) == -1);   /* stale edge never written */
+    CHECK(rd.findAllSingleBond().size() == 1);    /* only the good bond */
+}
