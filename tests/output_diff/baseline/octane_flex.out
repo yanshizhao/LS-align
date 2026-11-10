@@ -1,4 +1,0 @@
-
-        QEURY_NAME         TEMPL_NAME PC-score8Q PC-score8T  Pval_PC8Q  Pval_PC8T   JaccardR    RMSD_lb    QUERY_SIZE     TEMPL_SIZE 
-                                                                                                         (Without "H")  (Without "H")
-            OCTANE               SELF     0.1229     0.1638   0.233766   0.150167     0.0000     2.1042              8              6

@@ -1,11 +1,7 @@
 # 构建产物
-tests/build/
+build/
 *.exe
 *.o
-
-# output_diff 运行产物（baseline/ 与 expected/ 需提交，current/ 与 diffs/ 不提交）
-tests/output_diff/current/
-tests/output_diff/diffs/
 
 # 本地工具配置
 .claude/

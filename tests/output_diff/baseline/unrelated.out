@@ -1,4 +1,0 @@
-
-        QEURY_NAME         TEMPL_NAME PC-score8Q PC-score8T  Pval_PC8Q  Pval_PC8T   JaccardR    RMSD_lb    QUERY_SIZE     TEMPL_SIZE 
-                                                                                                         (Without "H")  (Without "H")
-            UNRELA             UNRELB     0.3129     0.3129   0.002765   0.002765     0.2000     1.3844              3              3

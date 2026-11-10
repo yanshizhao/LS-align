@@ -48,13 +48,14 @@ Notes on Windows:
  3. Do not use the Visual Studio command prompt unless it is on PATH; cl.exe
     was not tested here. MinGW-w64 is the supported Windows toolchain.
 
-A test suite (unit + CLI) is provided in ./tests; see tests/README.md.
-It builds the sources itself with the flags above (including the temp-dir
-workaround), and is the quickest way to verify a Windows build:
+A separate test framework (unit + CLI + golden + output-level regression)
+lives in the sibling repository `LSalign-refactor-tests-framework`. It
+builds these sources itself with the flags above (including the temp-dir
+workaround) and is the quickest way to verify a Windows build:
 
->cd /d/qlab/LSalign_src/LSalign_src20180916/tests
+>cd /d/qlab/LSalign_src/LSalign-refactor-tests-framework/tests
 
->make test
+>make test LSALIGN_SRC=../../LSalign_src20180916/src
 
 ========================================
  How to use LS-align

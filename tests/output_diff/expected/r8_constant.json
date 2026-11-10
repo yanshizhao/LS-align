@@ -1,9 +1,0 @@
-{
-  "_comment": "R8 修复后的期望差异模板。修复 R8 前本文件仅作示例，不被任何 exact 用例引用。",
-  "_usage": "当 self_self 用例切到 expected:r8_constant 后，runner 会检查：输出确与 baseline 不同（变化是预期的），并把 diffs/self_self.diff 留给人工核对。",
-  "_note": "R8 改搜索矩阵（min-max max==min 兜底为覆盖率）；报告 PC-score 走 junBondInfoScoMtx_for_final_sco，通常仍为 1.0。若修复后 stdout 无变化，则不应把该用例设为 expected —— 正确性由单元用例 r8_* 保证。",
-  "case": "self_self",
-  "baseline_pc_score8Q": 1.0,
-  "expected_pc_score8Q": 1.0,
-  "tolerance": 0.0001
-}
