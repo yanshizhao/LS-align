@@ -737,14 +737,33 @@ private:
 			return true;
 		}
 
-		if (4 == tokens.size()
-			&& isPureNumber(tokens[1]) && isPureNumber(tokens[2]) && isPureNumber(tokens[3])){
-			x = strtod(tokens[1].c_str(), NULL);
-			y = strtod(tokens[2].c_str(), NULL);
-			z = strtod(tokens[3].c_str(), NULL);
-			return true;
+		/* No four-token fallback for "index x y z": it cannot supply an atom
+		 * name or type, and the empty type silently zeroes the mass and vdW
+		 * matrices and disables the flexible overlap check downstream. */
+		if (tokens.size() < 5){
+			ostringstream oss;
+			oss << "record has " << tokens.size()
+				<< " fields; expected at least 5 (index, name, x, y, z)";
+			reason = oss.str();
+		}else if (record.size() >= 48){
+			/* Fixed columns were tried first, so name the axis by that layout. */
+			string sx = record.substr(17, 9);
+			string sy = record.substr(27, 9);
+			string sz = record.substr(37, 9);
+			if (!isPureNumber(sx)){
+				reason = "x = '" + trimWhitespace(sx) + "' is not a number";
+			}else if (!isPureNumber(sy)){
+				reason = "y = '" + trimWhitespace(sy) + "' is not a number";
+			}else{
+				reason = "z = '" + trimWhitespace(sz) + "' is not a number";
+			}
+		}else if (!isPureNumber(tokens[2])){
+			reason = "x = '" + tokens[2] + "' is not a number";
+		}else if (!isPureNumber(tokens[3])){
+			reason = "y = '" + tokens[3] + "' is not a number";
+		}else{
+			reason = "z = '" + tokens[4] + "' is not a number";
 		}
-
 		return false;
 	}
 
@@ -789,18 +808,29 @@ private:
 				if (oneLigMol2Infos[l].size() < 48){
 					cerr << "LSalign: " << filePath << ":" << blockStartLine + l
 						<< ": ATOM record too short for atom type column (ligand '"
-						<< ligname << "')\n     " << oneLigMol2Infos[l] << endl;
+						<< ligname << "')\n     " << reason << "\n     "
+						<< oneLigMol2Infos[l] << endl;
 				}else{
 					cerr << "LSalign: " << filePath << ":" << blockStartLine + l
 						<< ": cannot parse ATOM record (ligand '"
-						<< ligname << "')\n     " << oneLigMol2Infos[l] << endl;
+						<< ligname << "')\n     " << reason << "\n     "
+						<< oneLigMol2Infos[l] << endl;
 				}
 				exit(EXIT_FAILURE);
 			}
 
 			if (!isFiniteCoord(x) || !isFiniteCoord(y) || !isFiniteCoord(z)){
+				string axis = "x";
+				double value = x;
+				if (isFiniteCoord(x)){
+					axis = isFiniteCoord(y) ? "z" : "y";
+					value = isFiniteCoord(y) ? z : y;
+				}
+				ostringstream oss;
+				oss << axis << " = '" << value << "' is not finite";
 				cerr << "LSalign: " << filePath << ":" << blockStartLine + l
 					<< ": non-finite coordinate (ligand '" << ligname << "')" << "\n     "
+					<< oss.str() << "\n     "
 					<< oneLigMol2Infos[l] << endl;
 				exit(EXIT_FAILURE);
 			}
@@ -873,9 +903,13 @@ private:
 			bondInfo.bt = bondtype;
 			bondInfo.bondDisPow2 = points[atom1Ind].distPow2(points[atom2Ind]);
 			if (!(bondInfo.bondDisPow2 >= 0.0 && bondInfo.bondDisPow2 <= 1e308)){
+				ostringstream oss;
+				oss << "|bond|^2 = '" << bondInfo.bondDisPow2 << "' is not finite ("
+					<< atomtypes[atom1Ind] << "-" << atomtypes[atom2Ind] << ")";
 				cerr << "LSalign: " << filePath << ":" << blockStartLine + ll
 					<< ": non-finite bond length (ligand '" << ligname
 					<< "', atoms " << (atom1Ind+1) << "-" << (atom2Ind+1) << ")" << "\n     "
+					<< oss.str() << "\n     "
 					<< oneLigMol2Infos[ll] << endl;
 				exit(EXIT_FAILURE);
 			}
