@@ -698,9 +698,10 @@ private:
 	* the slices are not pure numbers fall back to whitespace tokens.
 	*************************************************************/
 	bool parseAtomRecord(const string& record, string& atomName, string& atomType,
-		double& x, double& y, double& z) const {
+		double& x, double& y, double& z, string& reason) const {
 		atomName = "";
 		atomType = "";
+		reason.clear();
 
 		if (record.size() >= 48){
 			string sx = record.substr(17, 9);
@@ -780,10 +781,11 @@ private:
 
 			string atomName;
 			string atomtype;
+			string reason;
 			double x = 0.0;
 			double y = 0.0;
 			double z = 0.0;
-			if (!parseAtomRecord(oneLigMol2Infos[l], atomName, atomtype, x, y, z)){
+			if (!parseAtomRecord(oneLigMol2Infos[l], atomName, atomtype, x, y, z, reason)){
 				if (oneLigMol2Infos[l].size() < 48){
 					cerr << "LSalign: " << filePath << ":" << blockStartLine + l
 						<< ": ATOM record too short for atom type column (ligand '"
