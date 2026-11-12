@@ -403,14 +403,14 @@ public:
 	* format this ligand as pdb file content
 	*******************************************************/
 	vector<string> format2PDB() const{
-		return format2PDB("JUN", 1, 88888);
+		return format2PDB("JUN", 1, 'J');
 	}
 	
 	vector<string> format2PDB(string ligtype) const{
-		return format2PDB(ligtype, 1, 88888);
+		return format2PDB(ligtype, 1, 'Q');
 	}
 	
-	vector<string> format2PDB(string ligtype, int atom_start_index, int mol_no) const{
+	vector<string> format2PDB(string ligtype, int atom_start_index, char chain_id) const{
 		int i = 0;
 		vector<string> ans;
 		char lt[4];
@@ -430,8 +430,8 @@ public:
 			/* 1000 bytes hold every finite double: "%8.3f" is at most 310
 			 * characters, so three coordinates plus the fixed columns fit. */
 			char buf[1000];
-			int n = snprintf(buf, sizeof(buf), "HETATM %4d %s %3s %5d    %8.3f%8.3f%8.3f  1.00  0.00",
-				(i+atom_start_index), nameField.c_str(), lt, mol_no,
+			int n = snprintf(buf, sizeof(buf), "HETATM %4d %s %3s %c%4d    %8.3f%8.3f%8.3f  1.00  0.00",
+				(i+atom_start_index), nameField.c_str(), lt, chain_id, 1,
 				points[i][0], points[i][1], points[i][2]);
 			string line(buf);
 			if (n < 0 || n >= (int)sizeof(buf) || line.size() > 76){

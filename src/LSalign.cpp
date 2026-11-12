@@ -565,9 +565,9 @@ int main(int argc, char* args[]){
 				&& i == OnlyRunQthLig
 				&& j == OnlyRunTthLig){
 					Ligand rotQuery = p_ali->getRottedQueryLigand();
-					vector<string> rotQVstr = rotQuery.format2PDB("QUE");
+					vector<string> rotQVstr = rotQuery.format2PDB("QUE", 1, 'Q');
 
-					vector<string> TVstr = templligs[j].format2PDB("TEM", 1001, 99999);
+					vector<string> TVstr = templligs[j].format2PDB("TEM", 1001, 'T');
 
 					ofstream fout(saveSupPath.c_str());	
 					int k = 0;
